@@ -1,0 +1,14 @@
+.vscode/*
+
+bin/*
+!bin/.gitkeep
+
+build/*.o
+
+logs/*
+!logs/.gitkeep
+
+data/*
+
+pipes/*
+!pipes/.gitkeep
