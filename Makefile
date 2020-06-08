@@ -1,4 +1,5 @@
 CC = gcc
+OFLAGS = -O3
 CFLAGS = -g3 -Wall -Wextra
 LDFLAGS =
 
@@ -16,10 +17,10 @@ _OBJ = main.o diseaseAggregator.o worker.o pipes.o stats.o list.o hashTable.o AV
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS)
-	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
+	$(CC) $(OFLAGS) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
 $(BDIR)/$(EXECUTABLE): $(OBJ)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 .PHONY: clean run valgrind
 
