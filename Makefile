@@ -1,4 +1,5 @@
 CC = gcc
+
 OFLAGS = -O3
 CFLAGS = -g3 -Wall -Wextra
 LDFLAGS =
@@ -9,6 +10,8 @@ IDIR = include
 SDIR = src
 
 EXECUTABLE = diseaseAggregator
+EXEC2 = whoServer
+EXEC3 = whoClient
 
 _DEPS = diseaseAggregator.h worker.h pipes.h stats.h list.h hashTable.h AVL.h patient.h date.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
@@ -19,8 +22,16 @@ OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS)
 	$(CC) $(OFLAGS) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
+all: $(BDIR)/$(EXECUTABLE) $(BDIR)/$(EXEC2) $(BDIR)/$(EXEC3)
+
 $(BDIR)/$(EXECUTABLE): $(OBJ)
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h
+	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
+
+$(BDIR)/$(EXEC3): $(SDIR)/client.c
+	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
 .PHONY: clean run valgrind
 

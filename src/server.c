@@ -21,6 +21,7 @@ typedef struct sockaddr_in SA_IN;
 static void *thread_run();
 static int server_init(uint16_t port, const int backlog);
 static int handle_query(const int socket);
+static int handle_statistic(const int socket);
 
 extern char *optarg;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -29,6 +30,7 @@ queue_ptr q = NULL;
 
 int main(int argc, char *argv[])
 {
+    char sockets_arr[FD_SETSIZE] = {0};
     fd_set r_fds, cur_fds;
     pthread_t *pool = NULL;
     uint16_t queryPortNum = 0, statisticsPortNum = 0;
@@ -66,6 +68,10 @@ int main(int argc, char *argv[])
             if ((numThreads = atoi(optarg)) == 0)
             {
                 fprintf(stderr, "Invalid value: %s\n", optarg);
+            }
+            if (numThreads > 20)
+            {
+                printf("wow a lot of threads, hope your machine can handle it\n");
             }
             break;
         case '?':
@@ -120,7 +126,6 @@ int main(int argc, char *argv[])
     while (1)
     {
         r_fds = cur_fds;
-        // memcpy(&r_fds, &cur_fds, sizeof(fd_set));
 
         if (pselect(FD_SETSIZE, &r_fds, NULL, NULL, NULL, NULL) == -1)
         {
@@ -139,20 +144,35 @@ int main(int argc, char *argv[])
                         perror("accept() failed");
                         exit(EXIT_FAILURE);
                     }
-
+                    printf("new connection: %d\n", cli_sockfd);
+                    sockets_arr[cli_sockfd] = 'q';
                     FD_SET(cli_sockfd, &cur_fds);
                 }
                 else if (i == s_sockfd)
                 {
-                    printf("wrong socket\n");
-                    // accept connection
+                    if ((cli_sockfd = accept(s_sockfd, NULL, NULL)) == -1)
+                    {
+                        perror("accept() failed");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    sockets_arr[cli_sockfd] = 's';
+                    FD_SET(cli_sockfd, &cur_fds);
                 }
                 else
                 {
+                    int val = 0;
+
                     pthread_mutex_lock(&mutex);
-                    enqueue(q, i);
-                    FD_CLR(i, &cur_fds);
-                    pthread_cond_signal(&condition_var);
+                    val = enqueue(q, i, sockets_arr[i]);
+
+                    if (val != -1 && val != -2)
+                    {
+                        sockets_arr[i] = 0;
+                        FD_CLR(i, &cur_fds);
+                        pthread_cond_signal(&condition_var);
+                    }
+
                     pthread_mutex_unlock(&mutex);
                 }
             }
@@ -176,21 +196,29 @@ static void *thread_run()
 {
     while (1)
     {
-        int *socket = NULL;
+        queue_node_ptr node = NULL;
 
         pthread_mutex_lock(&mutex);
 
-        if ((socket = dequeue(q)) == NULL)
+        if ((node = dequeue(q)) == NULL)
         {
             pthread_cond_wait(&condition_var, &mutex);
         }
 
         pthread_mutex_unlock(&mutex);
 
-        if (socket != NULL)
+        if (node != NULL)
         {
-            handle_query(*socket);
-            free(socket);
+            printf("about to handle a conn\n");
+            if (node->port == 'q')
+            {
+                handle_query(node->socket);
+            }
+            else if (node->port == 's')
+            {
+                handle_statistic(node->socket);
+            }
+            free(node);
         }
     }
 
@@ -201,8 +229,23 @@ static int handle_query(const int socket)
 {
     char buffer[100] = {0};
 
+    printf("reading..\n");
     read(socket, buffer, 100);
-    printf("%s", buffer);
+    printf("msg: %s\n", buffer);
+    write(socket, "i am the server", 100);
+    printf("done\n");
+
+    close(socket);
+
+    return 0;
+}
+
+static int handle_statistic(const int socket)
+{
+    char buffer[100] = {0};
+
+    read(socket, buffer, 100);
+    printf("STATISTIc: %s", buffer);
 
     close(socket);
 
@@ -223,7 +266,7 @@ static int server_init(uint16_t port, const int backlog)
     memset(&servaddr, 0, sizeof(SA_IN));
 
     servaddr.sin_family = AF_INET;
-    servaddr.sin_family = htonl(INADDR_ANY);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(port);
 
     if (bind(sockfd, (SA *)&servaddr, sizeof(SA_IN)) == -1)
@@ -237,6 +280,8 @@ static int server_init(uint16_t port, const int backlog)
         perror("listen() failed");
         return -1;
     }
+
+    printf("Server listening on port: %d\n", port);
 
     return sockfd;
 }

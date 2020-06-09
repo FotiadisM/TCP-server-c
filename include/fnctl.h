@@ -4,6 +4,7 @@
 typedef struct queue_node
 {
     int socket;
+    char port;
     struct queue_node *next;
 } queue_node;
 
@@ -22,7 +23,7 @@ typedef queue *queue_ptr;
 queue_ptr queue_init(const int bufferSize);
 void queue_close(queue_ptr q);
 
-int enqueue(queue_ptr q, const int value);
-int *dequeue(queue_ptr q);
+int enqueue(queue_ptr q, const int value, const char port);
+queue_node_ptr dequeue(queue_ptr q);
 
 #endif

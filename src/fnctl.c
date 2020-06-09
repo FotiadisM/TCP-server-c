@@ -35,7 +35,7 @@ void queue_close(queue_ptr q)
     free(q);
 }
 
-int enqueue(queue_ptr q, const int value)
+int enqueue(queue_ptr q, const int value, const char port)
 {
     queue_node_ptr node = NULL;
 
@@ -46,6 +46,7 @@ int enqueue(queue_ptr q, const int value)
     }
 
     node->socket = value;
+    node->port = port;
     node->next = NULL;
 
     if (q->len < q->max)
@@ -69,23 +70,14 @@ int enqueue(queue_ptr q, const int value)
     return -2;
 }
 
-int *dequeue(queue_ptr q)
+queue_node_ptr dequeue(queue_ptr q)
 {
-    int *value = NULL;
     queue_node_ptr node = q->head;
 
     if (node == NULL)
     {
         return NULL;
     }
-
-    if ((value = malloc(sizeof(int))) == NULL)
-    {
-        fprintf(stderr, "malloc() failed");
-        return NULL;
-    }
-
-    *value = q->head->socket;
 
     q->head = q->head->next;
 
@@ -96,7 +88,5 @@ int *dequeue(queue_ptr q)
 
     q->len--;
 
-    free(node);
-
-    return value;
+    return node;
 }
