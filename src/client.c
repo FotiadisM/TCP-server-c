@@ -9,18 +9,17 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 
-#define SERVER_BACKLOG 10
+#include "../include/client.h"
 
-typedef struct sockaddr SA;
-typedef struct sockaddr_in SA_IN;
+static void *thread_run(void *val);
 
 pthread_t *pool;
 
 int main(int argc, char *argv[])
 {
-    SA_IN servaddr;
-    char *queryFile = NULL, *serverIP = NULL;
-    int numThreads = 0, serverPort = 0, sockfd = 0;
+    thread_info info;
+    char *queryFile = NULL;
+    int numThreads = 0, err = 0;
 
     if (argc != 9)
     {
@@ -49,7 +48,7 @@ int main(int argc, char *argv[])
         }
         else if (!strcmp("-sp", argv[i]))
         {
-            if ((serverPort = atoi(argv[++i])) == 0)
+            if ((info.port = atoi(argv[++i])) == 0)
             {
                 fprintf(stderr, "Invalid value: %s\n", argv[i]);
                 return -1;
@@ -58,7 +57,7 @@ int main(int argc, char *argv[])
         else if (!strcmp("-sip", argv[i]))
         {
             i++;
-            if ((serverIP = strdup(argv[i])) == 0)
+            if ((info.serverIP = strdup(argv[i])) == 0)
             {
                 fprintf(stderr, "Invalid value: %s\n", argv[i]);
                 return -1;
@@ -77,41 +76,61 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    printf("%s %s %d %d\n", queryFile, serverIP, serverPort, numThreads);
+    for (int i = 0; i < numThreads; i++)
+    {
+        if ((err = pthread_create(&pool[i], NULL, thread_run, &info)) != 0)
+        {
+            fprintf(stderr, "pthread_create() failed: %s\n", strerror(err));
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < numThreads; i++)
+    {
+        pthread_join(pool[i], NULL);
+    }
+
+    free(pool);
+    free(queryFile);
+    free(info.serverIP);
+
+    return 0;
+}
+
+static void *thread_run(void *val)
+{
+    int sockfd;
+    SA_IN servaddr;
+    thread_info info;
+    char buffer[100] = {0};
+
+    memcpy(&info, val, sizeof(servaddr));
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
         perror("socket() failed");
-        return -1;
+        return NULL;
     }
 
     memset(&servaddr, 0, sizeof(SA_IN));
 
     servaddr.sin_family = AF_INET;
-    if (inet_pton(AF_INET, serverIP, &servaddr.sin_addr) != 1)
+    if (inet_pton(AF_INET, info.serverIP, &servaddr.sin_addr) != 1)
     {
         perror("inet_pton");
-        return -1;
+        return NULL;
     }
-    servaddr.sin_port = htons(serverPort);
-
-    free(serverIP);
+    servaddr.sin_port = htons(info.port);
 
     if (connect(sockfd, (SA *)&servaddr, sizeof(servaddr)) == -1)
     {
         perror("connect() failed");
-        return -1;
+        return NULL;
     }
 
-    char buffer[100] = {0};
     write(sockfd, "i am the client", 100);
     read(sockfd, buffer, 100);
     printf("buf: %s\n", buffer);
 
-    printf("all good my boy\n");
-
-    free(pool);
-    free(queryFile);
-
-    return 0;
+    return NULL;
 }

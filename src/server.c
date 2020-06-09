@@ -5,15 +5,19 @@
 #include <sys/select.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <pthread.h>
 
 #include "../include/fnctl.h"
 
 #define SERVER_BACKLOG 10
+#define SHUT_DOWN_TIME 3
+#define max(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct sockaddr SA;
 typedef struct sockaddr_in SA_IN;
@@ -22,19 +26,24 @@ static void *thread_run();
 static int server_init(uint16_t port, const int backlog);
 static int handle_query(const int socket);
 static int handle_statistic(const int socket);
+static void handler(int signum);
 
 extern char *optarg;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 queue_ptr q = NULL;
+volatile sig_atomic_t m_signal = 0;
 
 int main(int argc, char *argv[])
 {
     char sockets_arr[FD_SETSIZE] = {0};
+    struct sigaction act;
     fd_set r_fds, cur_fds;
     pthread_t *pool = NULL;
+    sigset_t blockset, emptyset;
     uint16_t queryPortNum = 0, statisticsPortNum = 0;
     int opt = 0, numThreads = 0, bufferSize = 0, q_sockfd = 0, s_sockfd = 0, cli_sockfd = 0, err = 0;
+    int maxfd = 0;
 
     if (argc != 9)
     {
@@ -122,72 +131,101 @@ int main(int argc, char *argv[])
     FD_ZERO(&cur_fds);
     FD_SET(q_sockfd, &cur_fds);
     FD_SET(s_sockfd, &cur_fds);
+    maxfd = max(q_sockfd, s_sockfd);
+
+    sigemptyset(&blockset);
+    sigemptyset(&emptyset);
+    sigaddset(&blockset, SIGINT);
+    sigprocmask(SIG_BLOCK, &blockset, NULL);
+
+    act.sa_handler = (void *)handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+    sigaction(SIGINT, &act, NULL);
 
     while (1)
     {
         r_fds = cur_fds;
 
-        if (pselect(FD_SETSIZE, &r_fds, NULL, NULL, NULL, NULL) == -1)
+        if (pselect(maxfd, &r_fds, NULL, NULL, NULL, &emptyset) == -1)
         {
-            perror("pselect() failed");
-            return -1;
-        }
-
-        for (int i = 0; i < FD_SETSIZE; i++)
-        {
-            if (FD_ISSET(i, &r_fds))
+            if (errno == EINTR)
             {
-                if (i == q_sockfd)
+                printf("\nexiting..\n");
+                if (m_signal == SIGINT)
                 {
-                    if ((cli_sockfd = accept(q_sockfd, NULL, NULL)) == -1)
-                    {
-                        perror("accept() failed");
-                        exit(EXIT_FAILURE);
-                    }
-                    printf("new connection: %d\n", cli_sockfd);
-                    sockets_arr[cli_sockfd] = 'q';
-                    FD_SET(cli_sockfd, &cur_fds);
+                    break;
                 }
-                else if (i == s_sockfd)
+            }
+            else
+            {
+                perror("pselect() failed");
+                return -1;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < maxfd; i++)
+            {
+                if (FD_ISSET(i, &r_fds))
                 {
-                    if ((cli_sockfd = accept(s_sockfd, NULL, NULL)) == -1)
+                    if (i == q_sockfd)
                     {
-                        perror("accept() failed");
-                        exit(EXIT_FAILURE);
+                        if ((cli_sockfd = accept(q_sockfd, NULL, NULL)) == -1)
+                        {
+                            perror("accept() failed");
+                            exit(EXIT_FAILURE);
+                        }
+
+                        sockets_arr[cli_sockfd] = 'q';
+                        FD_SET(cli_sockfd, &cur_fds);
+                        maxfd = max(maxfd, cli_sockfd) + 1;
                     }
-
-                    sockets_arr[cli_sockfd] = 's';
-                    FD_SET(cli_sockfd, &cur_fds);
-                }
-                else
-                {
-                    int val = 0;
-
-                    pthread_mutex_lock(&mutex);
-                    val = enqueue(q, i, sockets_arr[i]);
-
-                    if (val != -1 && val != -2)
+                    else if (i == s_sockfd)
                     {
-                        sockets_arr[i] = 0;
-                        FD_CLR(i, &cur_fds);
-                        pthread_cond_signal(&condition_var);
-                    }
+                        if ((cli_sockfd = accept(s_sockfd, NULL, NULL)) == -1)
+                        {
+                            perror("accept() failed");
+                            exit(EXIT_FAILURE);
+                        }
 
-                    pthread_mutex_unlock(&mutex);
+                        sockets_arr[cli_sockfd] = 's';
+                        FD_SET(cli_sockfd, &cur_fds);
+                    }
+                    else
+                    {
+                        int val = 0;
+
+                        pthread_mutex_lock(&mutex);
+                        val = enqueue(q, i, sockets_arr[i]);
+
+                        if (val != -1 && val != -2)
+                        {
+                            sockets_arr[i] = 0;
+                            FD_CLR(i, &cur_fds);
+                            pthread_cond_signal(&condition_var);
+                        }
+
+                        pthread_mutex_unlock(&mutex);
+                    }
                 }
             }
         }
     }
 
+    sleep(SHUT_DOWN_TIME); // wait for threads to finish their work;
+
     for (int i = 0; i < numThreads; i++)
     {
-        pthread_join(pool[i], NULL);
+        pthread_cancel(pool[i]); // needs improvement
+        // pthread_join(pool[i], NULL);
     }
-
-    free(pool);
 
     close(q_sockfd);
     close(s_sockfd);
+
+    queue_close(q);
+    free(pool);
 
     return 0;
 }
@@ -209,7 +247,6 @@ static void *thread_run()
 
         if (node != NULL)
         {
-            printf("about to handle a conn\n");
             if (node->port == 'q')
             {
                 handle_query(node->socket);
@@ -227,13 +264,11 @@ static void *thread_run()
 
 static int handle_query(const int socket)
 {
-    char buffer[100] = {0};
+    char buffer[2000] = {0};
 
-    printf("reading..\n");
-    read(socket, buffer, 100);
+    read(socket, buffer, 2000);
     printf("msg: %s\n", buffer);
     write(socket, "i am the server", 100);
-    printf("done\n");
 
     close(socket);
 
@@ -284,4 +319,9 @@ static int server_init(uint16_t port, const int backlog)
     printf("Server listening on port: %d\n", port);
 
     return sockfd;
+}
+
+static void handler(int signum)
+{
+    m_signal = signum;
 }
