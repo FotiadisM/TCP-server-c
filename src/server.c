@@ -141,7 +141,6 @@ int main(int argc, char *argv[])
                     }
 
                     FD_SET(cli_sockfd, &cur_fds);
-                    printf("new client\n");
                 }
                 else if (i == s_sockfd)
                 {
@@ -150,9 +149,8 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    printf("adding to q\n");
                     pthread_mutex_lock(&mutex);
-                    enqueue(q, cli_sockfd);
+                    enqueue(q, i);
                     FD_CLR(i, &cur_fds);
                     pthread_cond_signal(&condition_var);
                     pthread_mutex_unlock(&mutex);
@@ -204,7 +202,7 @@ static int handle_query(const int socket)
     char buffer[100] = {0};
 
     read(socket, buffer, 100);
-    printf("%s\n", buffer);
+    printf("%s", buffer);
 
     close(socket);
 
