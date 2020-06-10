@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 700
 
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,13 +12,18 @@
 
 static void *thread_run(void *val);
 
+int servPort;
 pthread_t *pool;
+char *servIP = NULL;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 
 int main(int argc, char *argv[])
 {
-    thread_info info;
-    char *queryFile = NULL;
+    size_t len = 0;
+    FILE *filePtr = NULL;
     int numThreads = 0, err = 0;
+    char *queryFile = NULL, **query_arr = NULL;
 
     if (argc != 9)
     {
@@ -48,7 +52,7 @@ int main(int argc, char *argv[])
         }
         else if (!strcmp("-sp", argv[i]))
         {
-            if ((info.port = atoi(argv[++i])) == 0)
+            if ((servPort = atoi(argv[++i])) == 0)
             {
                 fprintf(stderr, "Invalid value: %s\n", argv[i]);
                 return -1;
@@ -57,7 +61,7 @@ int main(int argc, char *argv[])
         else if (!strcmp("-sip", argv[i]))
         {
             i++;
-            if ((info.serverIP = strdup(argv[i])) == 0)
+            if ((servIP = strdup(argv[i])) == 0)
             {
                 fprintf(stderr, "Invalid value: %s\n", argv[i]);
                 return -1;
@@ -76,23 +80,71 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    for (int i = 0; i < numThreads; i++)
+    if ((query_arr = malloc(numThreads * sizeof(char *))) == NULL)
     {
-        if ((err = pthread_create(&pool[i], NULL, thread_run, &info)) != 0)
-        {
-            fprintf(stderr, "pthread_create() failed: %s\n", strerror(err));
-            return -1;
-        }
+        perror("malloc");
+        return -1;
     }
 
     for (int i = 0; i < numThreads; i++)
     {
-        pthread_join(pool[i], NULL);
+        query_arr[i] = NULL;
     }
+
+    if ((filePtr = fopen(queryFile, "r")) == NULL)
+    {
+        perror("fopen");
+        fprintf(stdout, "Unable to open file: %s", queryFile);
+    }
+
+    while (1)
+    {
+        int count = 0;
+
+        for (int i = 0; i < numThreads; i++)
+        {
+            if (getline(&query_arr[i], &len, filePtr) == -1)
+            {
+                break;
+            }
+            else
+            {
+                count++;
+                if ((err = pthread_create(&pool[i], NULL, thread_run, (void *)query_arr[i])) != 0)
+                {
+                    fprintf(stderr, "pthread_create() failed: %s\n", strerror(err));
+                    return -1;
+                }
+            }
+        }
+
+        if (count == 0)
+        {
+            break;
+        }
+
+        sleep(1); // wait for threads
+        pthread_cond_broadcast(&condition_var);
+
+        for (int i = 0; i < count; i++)
+        {
+            pthread_join(pool[i], NULL);
+        }
+
+        printf("\n");
+    }
+
+    for (int i = 0; i < numThreads; i++)
+    {
+        free(query_arr[i]);
+    }
+
+    fclose(filePtr);
 
     free(pool);
     free(queryFile);
-    free(info.serverIP);
+    free(servIP);
+    free(query_arr);
 
     return 0;
 }
@@ -101,10 +153,12 @@ static void *thread_run(void *val)
 {
     int sockfd;
     SA_IN servaddr;
-    thread_info info;
+    char *query = NULL;
     char buffer[100] = {0};
 
-    memcpy(&info, val, sizeof(servaddr));
+    query = (char *)val;
+
+    printf("que %s", query);
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
@@ -114,13 +168,20 @@ static void *thread_run(void *val)
 
     memset(&servaddr, 0, sizeof(SA_IN));
 
+    pthread_mutex_lock(&mutex);
     servaddr.sin_family = AF_INET;
-    if (inet_pton(AF_INET, info.serverIP, &servaddr.sin_addr) != 1)
+    if (inet_pton(AF_INET, servIP, &servaddr.sin_addr) != 1)
     {
         perror("inet_pton");
         return NULL;
     }
-    servaddr.sin_port = htons(info.port);
+    servaddr.sin_port = htons(servPort);
+
+    pthread_mutex_unlock(&mutex);
+
+    pthread_mutex_lock(&mutex);
+    pthread_cond_wait(&condition_var, &mutex);
+    pthread_mutex_unlock(&mutex);
 
     if (connect(sockfd, (SA *)&servaddr, sizeof(servaddr)) == -1)
     {

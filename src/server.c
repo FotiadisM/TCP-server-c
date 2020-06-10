@@ -16,7 +16,7 @@
 #include "../include/fnctl.h"
 
 #define SERVER_BACKLOG 10
-#define SHUT_DOWN_TIME 3
+#define SHUT_DOWN_TIME 2
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct sockaddr SA;
@@ -214,11 +214,11 @@ int main(int argc, char *argv[])
     }
 
     sleep(SHUT_DOWN_TIME); // wait for threads to finish their work;
+    pthread_cond_broadcast(&condition_var);
 
     for (int i = 0; i < numThreads; i++)
     {
-        pthread_cancel(pool[i]); // needs improvement
-        // pthread_join(pool[i], NULL);
+        pthread_join(pool[i], NULL);
     }
 
     close(q_sockfd);
@@ -240,6 +240,11 @@ static void *thread_run()
 
         if ((node = dequeue(q)) == NULL)
         {
+            if (m_signal == SIGINT)
+            {
+                pthread_mutex_unlock(&mutex);
+                break;
+            }
             pthread_cond_wait(&condition_var, &mutex);
         }
 

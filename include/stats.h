@@ -20,7 +20,7 @@ typedef struct stats
 
 typedef stats *statsPtr;
 
-int Worker_sendStatistics(const statsPtr st, const int w_fd, const size_t bufferSize, const char *country, const char *file);
+int Worker_sendStatistics(const statsPtr st, const int serverPort, const char *serverIP, const char *country, const char *file);
 ageInfoPtr ageInfo_Init();
 void ageInfo_add(ageInfoPtr ag, const char *age_str);
 statsPtr stats_Init();

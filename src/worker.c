@@ -21,7 +21,7 @@ volatile sig_atomic_t m_signal = 0;
 
 static int Worker_Init(int *w_fd, int *r_fd, ListPtr *list, HashTablePtr *h1, HashTablePtr *h2, struct sigaction **act);
 static string_nodePtr Worker_GetCountries(const int r_fd, const size_t bufferSize);
-static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr *dates, const int w_fd, const size_t bufferSize, const char *input_dir);
+static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr *dates, const int serverPort, const char *serverIP, const char *input_dir);
 static int Worker_wait_input(const int w_fd, const int r_fd, const size_t bufferSize, const ListPtr list, const HashTablePtr h1, const HashTablePtr h2, const string_nodePtr countries, string_nodePtr date, const char *input_dir);
 
 static void Worker_handleSignals(struct sigaction *act);
@@ -39,7 +39,7 @@ static PatientPtr getPatient(const wordexp_t *p, const char *country, const List
 static PatientPtr getPatientById(const char *id, const ListPtr list);
 static char *Worker_getPath(const char *input_dir, const char *country);
 
-int Worker(const size_t bufferSize, char *input_dir)
+int Worker(const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir)
 {
     int r_fd = 0, w_fd = 0;
     ListPtr list = NULL;
@@ -80,7 +80,7 @@ int Worker(const size_t bufferSize, char *input_dir)
         return -1;
     }
 
-    if (Worker_Run(list, diseaseHT, countryHT, countries, &dates, w_fd, bufferSize, input_dir) == -1)
+    if (Worker_Run(list, diseaseHT, countryHT, countries, &dates, serverPort, serverIP, input_dir) == -1)
     {
         printf("Worker_Run() failed\n");
     }
@@ -354,7 +354,7 @@ static int handle_sigusr1(ListPtr list, HashTablePtr h1, HashTablePtr h2, const 
     return 0;
 }
 
-static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr *dates, const int w_fd, const size_t bufferSize, const char *input_dir)
+static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr *dates, const int serverPort, const char *serverIP, const char *input_dir)
 {
     wordexp_t p;
     size_t len = 0;
@@ -460,11 +460,11 @@ static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const stri
                     wordfree(&p);
                 }
 
-                // if (Worker_sendStatistics(st, w_fd, bufferSize, country->str, dir_info->d_name) == -1)
-                // {
-                //     perror("Worker_sendStatistics");
-                //     return -1;
-                // }
+                if (Worker_sendStatistics(st, serverPort, serverIP, country->str, dir_info->d_name) == -1)
+                {
+                    perror("Worker_sendStatistics");
+                    return -1;
+                }
 
                 stats_close(st);
                 free(file);
@@ -477,8 +477,6 @@ static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const stri
 
         country = country->next;
     }
-
-    encode(w_fd, "OK", bufferSize);
 
     free(line);
 

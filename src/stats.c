@@ -1,3 +1,7 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,8 +10,13 @@
 #include "../include/pipes.h"
 #include "../include/list.h"
 
-int Worker_sendStatistics(const statsPtr st, const int w_fd, const size_t bufferSize, const char *country, const char *file)
+typedef struct sockaddr SA;
+typedef struct sockaddr_in SA_IN;
+
+int Worker_sendStatistics(const statsPtr st, const int serverPort, const char *serverIP, const char *country, const char *file)
 {
+    int sockfd = 0;
+    SA_IN servaddr;
     statsPtr node = st;
     size_t final_len = 0;
     string_nodePtr buffer_list = NULL, tmp = NULL;
@@ -71,7 +80,31 @@ int Worker_sendStatistics(const statsPtr st, const int w_fd, const size_t buffer
         tmp = tmp->next;
     }
 
-    encode(w_fd, final_buffer, bufferSize);
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("socket() failed");
+        return -1;
+    }
+
+    memset(&servaddr, 0, sizeof(SA_IN));
+
+    servaddr.sin_family = AF_INET;
+    if (inet_pton(AF_INET, serverIP, &servaddr.sin_addr) != 1)
+    {
+        perror("inet_pton");
+        return -1;
+    }
+    servaddr.sin_port = htons(serverPort);
+
+    if (connect(sockfd, (SA *)&servaddr, sizeof(servaddr)) == -1)
+    {
+        perror("connect() failed");
+        return -1;
+    }
+
+    encode(sockfd, final_buffer, 5);
+
+    close(sockfd);
 
     free(date);
     free(final_buffer);

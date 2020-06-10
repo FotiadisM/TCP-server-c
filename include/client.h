@@ -8,6 +8,7 @@ typedef struct thread_info
 {
     int port;
     char *serverIP;
+    char *line;
 } thread_info;
 
 #endif

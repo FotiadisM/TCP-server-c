@@ -24,7 +24,7 @@ static void Parent_handleSignals(struct sigaction *act, const int t_siganl);
 
 static int DA_DevideWork(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const char *input_dir);
 static int DA_main(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize);
-static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, char *input_dir);
+static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir);
 
 static int listCountries(const worker_infoPtr workers_array, const int numWorkers);
 static int diseaseFrequency(const worker_infoPtr workers_array, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
@@ -33,9 +33,9 @@ static int topk_AgeRanges(const worker_infoPtr workers_array, const int numWorke
 static int general(const worker_infoPtr workers_array, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
 
 static int handle_sigint(worker_infoPtr workers_array, const int numWorkers, const int count, const int err);
-static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, char *input_dir, char *str);
+static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir, char *str);
 
-int DA_Run(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, char *input_dir)
+int DA_Run(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir)
 {
     sigset_t blockset;
     struct sigaction act;
@@ -57,13 +57,13 @@ int DA_Run(worker_infoPtr workers_array, const int numWorkers, const size_t buff
 
     Parent_handleSignals(&act, SIGCHLD);
 
-    if (DA_main(workers_array, numWorkers, bufferSize) == -1)
-    {
-        printf("DA_main() failed");
-        return -1;
-    }
+    // if (DA_main(workers_array, numWorkers, bufferSize) == -1)
+    // {
+    //     printf("DA_main() failed");
+    //     return -1;
+    // }
 
-    if (DA_wait_input(workers_array, numWorkers, bufferSize, input_dir) == -1)
+    if (DA_wait_input(workers_array, numWorkers, bufferSize, serverPort, serverIP, input_dir) == -1)
     {
         printf("DA_wait_input() failed");
         return -1;
@@ -213,7 +213,7 @@ static int DA_main(worker_infoPtr workers_array, const int numWorkers, const siz
     return 0;
 }
 
-static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, char *input_dir)
+static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir)
 {
     int count = 0, err = 0;
     fd_set rfds;
@@ -243,7 +243,7 @@ static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, con
                 }
                 else if (d_signal == 2)
                 {
-                    handle_sigchild(workers_array, numWorkers, bufferSize, input_dir, str);
+                    handle_sigchild(workers_array, numWorkers, bufferSize, serverPort, serverIP, input_dir, str);
                 }
             }
             else
@@ -678,7 +678,7 @@ static int handle_sigint(worker_infoPtr workers_array, const int numWorkers, con
     return 0;
 }
 
-static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, char *input_dir, char *str)
+static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir, char *str)
 {
     pid_t pid = 0;
 
@@ -712,7 +712,7 @@ static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, c
                     free(str);
                 }
 
-                if (Worker(bufferSize, input_dir) == -1)
+                if (Worker(bufferSize, serverPort, serverIP, input_dir) == -1)
                 {
                     printf("worker exiting\n");
                     exit(EXIT_FAILURE);

@@ -16,10 +16,16 @@ int main(int argc, char *argv[])
     pid_t pid = 0;
     size_t bufferSize = 0;
     worker_infoPtr workers_array = NULL;
-    int numWorkers = 0, opt = 0;
-    char *input_dir = NULL;
+    int numWorkers = 0, opt = 0, serverPort = 0;
+    char *input_dir = NULL, *serverIP = NULL;
 
-    while ((opt = getopt(argc, argv, "w:b:i:")) != -1)
+    if (argc != 11)
+    {
+        fprintf(stderr, "Usage: ./diseaseAggregator –w <numWorkers> -b <bufferSize> -i <input_dir>\n");
+        return -1;
+    }
+
+    while ((opt = getopt(argc, argv, "w:b:i:s:p:")) != -1)
     {
         switch (opt)
         {
@@ -35,10 +41,22 @@ int main(int argc, char *argv[])
                 printf("Invalid value: %s\n", optarg);
             }
             break;
+        case 'p':
+            if ((serverPort = atoi(optarg)) == 0)
+            {
+                printf("Invalid value: %s\n", optarg);
+            }
+            break;
         case 'i':
             if ((input_dir = strdup(optarg)) == NULL)
             {
-                perror("malloc");
+                perror("strdup");
+            }
+            break;
+        case 's':
+            if ((serverIP = strdup(optarg)) == NULL)
+            {
+                perror("strdup");
             }
             break;
         case '?':
@@ -81,7 +99,7 @@ int main(int argc, char *argv[])
         {
             free(workers_array);
 
-            if (Worker(bufferSize, input_dir) == -1)
+            if (Worker(bufferSize, serverPort, serverIP, input_dir) == -1)
             {
                 printf("worker exiting\n");
                 exit(EXIT_FAILURE);
@@ -106,7 +124,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (DA_Run(workers_array, numWorkers, bufferSize, input_dir) == -1)
+    if (DA_Run(workers_array, numWorkers, bufferSize, serverPort, serverIP, input_dir) == -1)
     {
         printf("DA_Run() failed, exiting\n");
     }

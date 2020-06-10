@@ -39,7 +39,7 @@ run:
 	./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -i ./data
 
 valgrind:
-	valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all ./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -i ./data 
+	valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all ./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -s 127.0.0.1 -p 4010 -i ./data 
 
 clean:
 	rm -f logs/log*
