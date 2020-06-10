@@ -32,7 +32,6 @@ int Worker_sendStatistics(const statsPtr st, const int serverPort, const char *s
 
     while (node != NULL)
     {
-
         sprintf(ag1, "%d", node->ag->ag1);
         sprintf(ag2, "%d", node->ag->ag2);
         sprintf(ag3, "%d", node->ag->ag3);
@@ -102,7 +101,7 @@ int Worker_sendStatistics(const statsPtr st, const int serverPort, const char *s
         return -1;
     }
 
-    encode(sockfd, final_buffer, 5);
+    encode(sockfd, final_buffer, 2000);
 
     close(sockfd);
 

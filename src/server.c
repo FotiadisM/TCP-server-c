@@ -14,6 +14,7 @@
 #include <pthread.h>
 
 #include "../include/fnctl.h"
+#include "../include/pipes.h"
 
 #define SERVER_BACKLOG 10
 #define SHUT_DOWN_TIME 2
@@ -131,7 +132,7 @@ int main(int argc, char *argv[])
     FD_ZERO(&cur_fds);
     FD_SET(q_sockfd, &cur_fds);
     FD_SET(s_sockfd, &cur_fds);
-    maxfd = max(q_sockfd, s_sockfd);
+    maxfd = max(q_sockfd, s_sockfd) + 1;
 
     sigemptyset(&blockset);
     sigemptyset(&emptyset);
@@ -191,6 +192,7 @@ int main(int argc, char *argv[])
 
                         sockets_arr[cli_sockfd] = 's';
                         FD_SET(cli_sockfd, &cur_fds);
+                        maxfd = max(maxfd, cli_sockfd) + 1;
                     }
                     else
                     {
@@ -273,7 +275,7 @@ static int handle_query(const int socket)
 
     read(socket, buffer, 2000);
     printf("msg: %s\n", buffer);
-    write(socket, "i am the server", 100);
+    // write(socket, "i am the server", 100);
 
     close(socket);
 
@@ -282,10 +284,11 @@ static int handle_query(const int socket)
 
 static int handle_statistic(const int socket)
 {
-    char buffer[100] = {0};
+    char *buffer = NULL;
 
-    read(socket, buffer, 100);
-    printf("STATISTIc: %s", buffer);
+    buffer = decode(socket, 10);
+    printf("%s", buffer);
+    free(buffer);
 
     close(socket);
 

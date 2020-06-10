@@ -136,6 +136,7 @@ int main(int argc, char *argv[])
         clear_stringNode(workers_array[i].countries_list);
     }
 
+    free(serverIP);
     free(workers_array);
     free(input_dir);
 
