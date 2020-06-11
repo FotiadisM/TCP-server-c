@@ -1,6 +1,9 @@
 #ifndef STATS_H
 #define STATS_H
 
+typedef struct sockaddr SA;
+typedef struct sockaddr_in SA_IN;
+
 typedef struct ageInfo
 {
     int ag1;

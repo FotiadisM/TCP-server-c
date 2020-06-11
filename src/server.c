@@ -18,6 +18,7 @@
 
 #define SERVER_BACKLOG 10
 #define SHUT_DOWN_TIME 2
+#define SOCK_BUFFER 100
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct sockaddr SA;
@@ -31,20 +32,21 @@ static void handler(int signum);
 
 extern char *optarg;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t wp_mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 queue_ptr q = NULL;
+worker_ptr work_arr = NULL;
 volatile sig_atomic_t m_signal = 0;
 
 int main(int argc, char *argv[])
 {
-    char sockets_arr[FD_SETSIZE] = {0};
     struct sigaction act;
     fd_set r_fds, cur_fds;
     pthread_t *pool = NULL;
     sigset_t blockset, emptyset;
+    char sockets_arr[FD_SETSIZE] = {0};
     uint16_t queryPortNum = 0, statisticsPortNum = 0;
-    int opt = 0, numThreads = 0, bufferSize = 0, q_sockfd = 0, s_sockfd = 0, cli_sockfd = 0, err = 0;
-    int maxfd = 0;
+    int opt = 0, numThreads = 0, bufferSize = 0, q_sockfd = 0, s_sockfd = 0, cli_sockfd = 0, err = 0, maxfd = 0;
 
     if (argc != 9)
     {
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
 
     while ((opt = getopt(argc, argv, "q:s:w:b:")) != -1)
     {
-        switch (opt)
+        switch (opt) /* condition */
         {
         case 'q':
             if ((queryPortNum = atoi(optarg)) == 0)
@@ -286,8 +288,34 @@ static int handle_statistic(const int socket)
 {
     char *buffer = NULL;
 
-    buffer = decode(socket, 10);
-    printf("%s", buffer);
+    if ((buffer = decode(socket, 10)) == NULL)
+    {
+        fprintf(stderr, "decode() failed");
+    }
+
+    if (!strcmp(buffer, "HANDSHAKE"))
+    {
+        SA_IN clientaddr;
+        socklen_t sa_len = sizeof(SA_IN);
+
+        free(buffer);
+        if ((buffer = decode(socket, 10)) == NULL)
+        {
+            fprintf(stderr, "decode() failed");
+        }
+
+        memset(&clientaddr, 0, sizeof(SA_IN));
+        getsockname(socket, (SA *)&clientaddr, &sa_len);
+
+        pthread_mutex_lock(&wp_mtx);
+        work_arr = add_worker(work_arr, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port));
+        pthread_mutex_unlock(&wp_mtx);
+    }
+    else
+    {
+        // handle stats
+    }
+
     free(buffer);
 
     close(socket);

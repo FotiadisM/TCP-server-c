@@ -10,9 +10,6 @@
 #include "../include/pipes.h"
 #include "../include/list.h"
 
-typedef struct sockaddr SA;
-typedef struct sockaddr_in SA_IN;
-
 int Worker_sendStatistics(const statsPtr st, const int serverPort, const char *serverIP, const char *country, const char *file)
 {
     int sockfd = 0;

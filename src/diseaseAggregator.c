@@ -254,7 +254,10 @@ static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, con
         }
         else
         {
-            getline(&str, &len, stdin);
+            if (getline(&str, &len, stdin) == -1)
+            {
+                perror("getline() failed");
+            }
 
             if (strcmp(str, "\n"))
             {

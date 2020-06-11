@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../include/fnctl.h"
 
@@ -89,4 +90,65 @@ queue_node_ptr dequeue(queue_ptr q)
     q->len--;
 
     return node;
+}
+
+worker_ptr add_worker(worker_ptr wp, const char *ip, const int port)
+{
+    worker_ptr new_wp = NULL;
+
+    if ((new_wp = malloc(sizeof(worker_i))) == NULL)
+    {
+        perror("malloc");
+        return NULL;
+    }
+
+    if ((new_wp->ip = strdup(ip)) == NULL)
+    {
+        perror("strdup");
+        return NULL;
+    }
+    new_wp->port = port;
+    new_wp->countries = NULL;
+    new_wp->next = wp;
+
+    return new_wp;
+}
+
+void worker_close(worker_ptr wp)
+{
+    worker_ptr tmp_wp = wp;
+
+    while (wp != NULL)
+    {
+        tmp_wp = wp;
+
+        free(wp->ip);
+        clear_stringNode(wp->countries);
+        free(wp);
+
+        wp = wp->next;
+    }
+}
+
+int add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country)
+{
+    worker_ptr tmp_wp = wp;
+
+    while (tmp_wp != NULL)
+    {
+        if (tmp_wp->port == port)
+        {
+            if (!strcmp(tmp_wp->ip, ip))
+            {
+                if ((tmp_wp->countries = add_stringNode(tmp_wp->countries, country)) == NULL)
+                {
+                    fprintf(stderr, "add_stringNode() failed");
+                    return -1;
+                }
+                return 0;
+            }
+        }
+
+        tmp_wp = tmp_wp->next;
+    }
 }

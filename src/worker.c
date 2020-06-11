@@ -3,6 +3,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -22,7 +24,7 @@ volatile sig_atomic_t m_signal = 0;
 static int Worker_Init(int *w_fd, int *r_fd, ListPtr *list, HashTablePtr *h1, HashTablePtr *h2, struct sigaction **act);
 static string_nodePtr Worker_GetCountries(const int r_fd, const size_t bufferSize);
 static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr *dates, const int serverPort, const char *serverIP, const char *input_dir);
-static int Worker_wait_input(const int w_fd, const int r_fd, const size_t bufferSize, const ListPtr list, const HashTablePtr h1, const HashTablePtr h2, const string_nodePtr countries, string_nodePtr date, const char *input_dir);
+static int Worker_wait_input(const int w_fd, const int r_fd, const size_t bufferSize, const int serverPort, const char *serverIP, const ListPtr list, const HashTablePtr h1, const HashTablePtr h2, const string_nodePtr countries, string_nodePtr date, const char *input_dir);
 
 static void Worker_handleSignals(struct sigaction *act);
 static void handler(int signum);
@@ -85,7 +87,7 @@ int Worker(const size_t bufferSize, const int serverPort, const char *serverIP, 
         printf("Worker_Run() failed\n");
     }
 
-    if (Worker_wait_input(w_fd, r_fd, bufferSize, list, diseaseHT, countryHT, countries, dates, input_dir) == -1)
+    if (Worker_wait_input(w_fd, r_fd, bufferSize, serverPort, serverIP, list, diseaseHT, countryHT, countries, dates, input_dir) == -1)
     {
         perror("Worker_wait_input() failed");
         return -1;
@@ -227,8 +229,6 @@ static void handle_sigint(const string_nodePtr countries, const int count, const
     fprintf(filePtr, "\nTotal: %d\nSuccessful: %d\nError: %d", count + err, count, err);
 
     fclose(filePtr);
-
-    printf("worker: %d recieved siganl\n", getpid());
 }
 
 static int handle_sigusr1(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir)
@@ -483,23 +483,54 @@ static int Worker_Run(ListPtr list, HashTablePtr h1, HashTablePtr h2, const stri
     return 0;
 }
 
-static int Worker_wait_input(const int w_fd, const int r_fd, const size_t bufferSize, const ListPtr list, const HashTablePtr h1, const HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir)
+static int Worker_wait_input(const int w_fd, const int r_fd, const size_t bufferSize, const int serverPort, const char *serverIP, const ListPtr list, const HashTablePtr h1, const HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir)
 {
-    int count = 0, err = 0;
     fd_set rfds;
     wordexp_t p;
+    SA_IN servaddr;
     char *str = NULL;
+    sigset_t emptyset;
+    int count = 0, err = 0, sockfd = 0;
+
+    sigemptyset(&emptyset);
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("socket() failed");
+        return -1;
+    }
+
+    memset(&servaddr, 0, sizeof(SA_IN));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(0);
+
+    if (bind(sockfd, (SA *)&servaddr, sizeof(SA_IN)) == -1)
+    {
+        perror("bind() failed");
+        return -1;
+    }
+
+    if (listen(sockfd, 10) == -1)
+    {
+        perror("listen() failed");
+        return -1;
+    }
+
+    memset(&servaddr, 0, sizeof(SA_IN));
+    socklen_t sa_len = sizeof(SA_IN);
+    getsockname(sockfd, (SA *)&servaddr, &sa_len);
+
+    printf("Worker listening on port: %d\n", ntohs(servaddr.sin_port));
 
     while (1)
     {
-        sigset_t emptyset;
-
-        sigemptyset(&emptyset);
-
         FD_ZERO(&rfds);
+        FD_SET(sockfd, &rfds);
         FD_SET(r_fd, &rfds);
 
-        if (pselect(r_fd + 1, &rfds, NULL, NULL, NULL, &emptyset) == -1)
+        if (pselect(sockfd + 1, &rfds, NULL, NULL, NULL, &emptyset) == -1)
         {
             if (errno == EINTR)
             {
@@ -520,7 +551,23 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
         }
         else
         {
-            str = decode(r_fd, bufferSize);
+            int answfd = 0;
+
+            if (FD_ISSET(r_fd, &rfds))
+            {
+                str = decode(r_fd, bufferSize);
+                answfd = w_fd;
+            }
+            else
+            {
+                if ((answfd = accept(sockfd, NULL, NULL)) == -1)
+                {
+                    perror("accept() failed");
+                    exit(EXIT_FAILURE);
+                }
+                str = decode(answfd, bufferSize);
+                printf("web req\n");
+            }
 
             wordexp(str, &p, 0);
 
@@ -532,7 +579,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             }
             else if (!strcmp(p.we_wordv[0], "/diseaseFrequency"))
             {
-                if (diseaseFrequency(w_fd, bufferSize, str, h1) == -1)
+                if (diseaseFrequency(answfd, bufferSize, str, h1) == -1)
                 {
                     err++;
                 }
@@ -543,7 +590,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             }
             else if (!strcmp(p.we_wordv[0], "/topk-AgeRanges"))
             {
-                if (topk_AgeRanges(w_fd, bufferSize, str, list) == -1)
+                if (topk_AgeRanges(answfd, bufferSize, str, list) == -1)
                 {
                     err++;
                 }
@@ -554,7 +601,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             }
             else if (!strcmp(p.we_wordv[0], "/searchPatientRecord"))
             {
-                if (searchPatientRecord(&p, w_fd, bufferSize, list) == -1)
+                if (searchPatientRecord(&p, answfd, bufferSize, list) == -1)
                 {
                     err++;
                 }
@@ -565,7 +612,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             }
             else if (!strcmp(p.we_wordv[0], "/numPatientAdmissions"))
             {
-                if (numFunctions(w_fd, bufferSize, str, h2, list, ENTER) == -1)
+                if (numFunctions(answfd, bufferSize, str, h2, list, ENTER) == -1)
                 {
                     err++;
                 }
@@ -576,7 +623,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             }
             else if (!strcmp(p.we_wordv[0], "/numPatientDischarges"))
             {
-                if (numFunctions(w_fd, bufferSize, str, h2, list, EXIT) == -1)
+                if (numFunctions(answfd, bufferSize, str, h2, list, EXIT) == -1)
                 {
                     err++;
                 }
@@ -584,6 +631,11 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
                 {
                     count++;
                 }
+            }
+
+            if (FD_ISSET(sockfd, &rfds))
+            {
+                close(answfd);
             }
 
             wordfree(&p);
