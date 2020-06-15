@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -33,6 +34,7 @@ static void handler(int signum);
 extern char *optarg;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t wp_mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t smpl = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 queue_ptr q = NULL;
 worker_ptr work_arr = NULL;
@@ -180,7 +182,9 @@ int main(int argc, char *argv[])
                             exit(EXIT_FAILURE);
                         }
 
+                        pthread_mutex_lock(&smpl);
                         sockets_arr[cli_sockfd] = 'q';
+                        pthread_mutex_unlock(&smpl);
                         FD_SET(cli_sockfd, &cur_fds);
                         maxfd = max(maxfd, cli_sockfd) + 1;
                     }
@@ -192,7 +196,9 @@ int main(int argc, char *argv[])
                             exit(EXIT_FAILURE);
                         }
 
+                        pthread_mutex_lock(&smpl);
                         sockets_arr[cli_sockfd] = 's';
+                        pthread_mutex_unlock(&smpl);
                         FD_SET(cli_sockfd, &cur_fds);
                         maxfd = max(maxfd, cli_sockfd) + 1;
                     }
@@ -228,8 +234,9 @@ int main(int argc, char *argv[])
     close(q_sockfd);
     close(s_sockfd);
 
-    queue_close(q);
     free(pool);
+    queue_close(q);
+    worker_close(work_arr);
 
     return 0;
 }
@@ -241,7 +248,6 @@ static void *thread_run()
         queue_node_ptr node = NULL;
 
         pthread_mutex_lock(&mutex);
-
         if ((node = dequeue(q)) == NULL)
         {
             if (m_signal == SIGINT)
@@ -251,17 +257,19 @@ static void *thread_run()
             }
             pthread_cond_wait(&condition_var, &mutex);
         }
-
         pthread_mutex_unlock(&mutex);
 
         if (node != NULL)
         {
+            pthread_mutex_lock(&smpl);
             if (node->port == 'q')
             {
+                pthread_mutex_unlock(&smpl);
                 handle_query(node->socket);
             }
             else if (node->port == 's')
             {
+                pthread_mutex_unlock(&smpl);
                 handle_statistic(node->socket);
             }
             free(node);
@@ -288,9 +296,10 @@ static int handle_statistic(const int socket)
 {
     char *buffer = NULL;
 
-    if ((buffer = decode(socket, 10)) == NULL)
+    if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
     {
-        fprintf(stderr, "decode() failed");
+        fprintf(stderr, "decode() failed\n");
+        return -1;
     }
 
     if (!strcmp(buffer, "HANDSHAKE"))
@@ -298,25 +307,40 @@ static int handle_statistic(const int socket)
         SA_IN clientaddr;
         socklen_t sa_len = sizeof(SA_IN);
 
-        free(buffer);
-        if ((buffer = decode(socket, 10)) == NULL)
-        {
-            fprintf(stderr, "decode() failed");
-        }
-
         memset(&clientaddr, 0, sizeof(SA_IN));
         getsockname(socket, (SA *)&clientaddr, &sa_len);
 
-        pthread_mutex_lock(&wp_mtx);
-        work_arr = add_worker(work_arr, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port));
-        pthread_mutex_unlock(&wp_mtx);
+        free(buffer);
+        while (1)
+        {
+            if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
+            {
+                fprintf(stderr, "decode() failed\n");
+                return -1;
+            }
+
+            if (!strcmp(buffer, "OK"))
+            {
+                free(buffer);
+                break;
+            }
+
+            pthread_mutex_lock(&wp_mtx);
+            if ((work_arr = add_worker_country(work_arr, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer)) == NULL)
+            {
+                fprintf(stderr, "add_worker_country() failed\n");
+                return -1;
+            }
+            pthread_mutex_unlock(&wp_mtx);
+
+            free(buffer);
+        }
     }
     else
     {
         // handle stats
+        free(buffer);
     }
-
-    free(buffer);
 
     close(socket);
 

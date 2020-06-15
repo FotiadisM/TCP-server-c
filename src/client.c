@@ -8,7 +8,8 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 
-#include "../include/client.h"
+typedef struct sockaddr SA;
+typedef struct sockaddr_in SA_IN;
 
 static void *thread_run(void *val);
 
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
     {
         perror("fopen");
         fprintf(stdout, "Unable to open file: %s", queryFile);
+        return -1;
     }
 
     while (1)
@@ -176,7 +178,6 @@ static void *thread_run(void *val)
         return NULL;
     }
     servaddr.sin_port = htons(servPort);
-
     pthread_mutex_unlock(&mutex);
 
     pthread_mutex_lock(&mutex);
@@ -192,6 +193,8 @@ static void *thread_run(void *val)
     write(sockfd, "i am the client", 100);
     read(sockfd, buffer, 100);
     printf("buf: %s\n", buffer);
+
+    close(sockfd);
 
     return NULL;
 }

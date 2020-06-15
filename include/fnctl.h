@@ -41,6 +41,6 @@ queue_node_ptr dequeue(queue_ptr q);
 worker_ptr add_worker(worker_ptr wp, const char *ip, const int port);
 void worker_close(worker_ptr wp);
 
-int add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country);
+worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country);
 
 #endif

@@ -27,7 +27,7 @@ all: $(BDIR)/$(EXECUTABLE) $(BDIR)/$(EXEC2) $(BDIR)/$(EXEC3)
 $(BDIR)/$(EXECUTABLE): $(OBJ)
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes.c
+$(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes.c $(SDIR)/list.c $(SDIR)/patient.c $(SDIR)/date.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
 $(BDIR)/$(EXEC3): $(SDIR)/client.c

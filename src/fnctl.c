@@ -121,16 +121,15 @@ void worker_close(worker_ptr wp)
     while (wp != NULL)
     {
         tmp_wp = wp;
-
-        free(wp->ip);
-        clear_stringNode(wp->countries);
-        free(wp);
-
         wp = wp->next;
+
+        free(tmp_wp->ip);
+        clear_stringNode(tmp_wp->countries);
+        free(tmp_wp);
     }
 }
 
-int add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country)
+worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country)
 {
     worker_ptr tmp_wp = wp;
 
@@ -143,12 +142,25 @@ int add_worker_country(worker_ptr wp, const char *ip, const int port, const char
                 if ((tmp_wp->countries = add_stringNode(tmp_wp->countries, country)) == NULL)
                 {
                     fprintf(stderr, "add_stringNode() failed");
-                    return -1;
+                    return NULL;
                 }
-                return 0;
+                return wp;
             }
         }
 
         tmp_wp = tmp_wp->next;
     }
+
+    if ((tmp_wp = add_worker(wp, ip, port)) == NULL)
+    {
+        fprintf(stderr, "add_worker() failed\n");
+        return NULL;
+    }
+    if ((tmp_wp->countries = add_stringNode(tmp_wp->countries, country)) == NULL)
+    {
+        fprintf(stderr, "add_stringNode failed\n");
+        return NULL;
+    }
+
+    return tmp_wp;
 }

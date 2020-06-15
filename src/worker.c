@@ -31,6 +31,7 @@ static void handler(int signum);
 static void handle_sigint(const string_nodePtr countries, const int count, const int err);
 static int handle_sigusr1(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir);
 
+static int handsake(const char *ip, const int port, const string_nodePtr countries);
 static int diseaseFrequency(const int w_fd, const size_t bufferSize, const char *str, const HashTablePtr ht);
 static int topk_AgeRanges(const int w_fd, const size_t bufferSize, const char *str, const ListPtr list);
 static int searchPatientRecord(wordexp_t *p, const int w_fd, const size_t bufferSize, const ListPtr list);
@@ -523,6 +524,10 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
     getsockname(sockfd, (SA *)&servaddr, &sa_len);
 
     printf("Worker listening on port: %d\n", ntohs(servaddr.sin_port));
+    if (handsake(serverIP, serverPort, countries) == -1)
+    {
+        fprintf(stderr, "handsake() failed\n");
+    }
 
     while (1)
     {
@@ -642,6 +647,64 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
             free(str);
         }
     }
+
+    return 0;
+}
+
+static int handsake(const char *ip, const int port, const string_nodePtr countries)
+{
+    int sockfd;
+    SA_IN servaddr;
+    string_nodePtr node = countries;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("socket() failed");
+        return -1;
+    }
+
+    memset(&servaddr, 0, sizeof(SA_IN));
+
+    servaddr.sin_family = AF_INET;
+    if (inet_pton(AF_INET, ip, &servaddr.sin_addr) != 1)
+    {
+        perror("inet_pton");
+        return -1;
+    }
+    servaddr.sin_port = htons(port);
+
+    printf("ip: %s, port: %d", ip, port);
+
+    if (connect(sockfd, (SA *)&servaddr, sizeof(SA_IN)) == -1)
+    {
+        perror("connect() failed");
+        return -1;
+    }
+
+    if (encode(sockfd, "HANDSHAKE", 100) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+        return -1;
+    }
+
+    while (node != NULL)
+    {
+        if (encode(sockfd, node->str, 100) == -1)
+        {
+            fprintf(stderr, "encode() failed");
+            return -1;
+        }
+
+        node = node->next;
+    }
+
+    if (encode(sockfd, "OK", 100) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+        return -1;
+    }
+
+    close(sockfd);
 
     return 0;
 }
