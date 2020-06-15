@@ -1,7 +1,12 @@
 #ifndef FNCTL_h
 #define FNCTL_H
 
+#include <wordexp.h>
+
 #include "../include/list.h"
+
+typedef struct sockaddr SA;
+typedef struct sockaddr_in SA_IN;
 
 typedef struct queue_node
 {
@@ -34,13 +39,19 @@ typedef worker_i *worker_ptr;
 
 queue_ptr queue_init(const int bufferSize);
 void queue_close(queue_ptr q);
-
 int enqueue(queue_ptr q, const int value, const char port);
 queue_node_ptr dequeue(queue_ptr q);
 
 worker_ptr add_worker(worker_ptr wp, const char *ip, const int port);
 void worker_close(worker_ptr wp);
-
 worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country);
+
+worker_ptr getWorker(const worker_ptr wp, const int numWorkers, const char *str);
+int searchPatientRecord(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
+int topk_AgeRanges(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
+int numFunction(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
+int diseaseFrequency(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
+
+int send_to(const char *ip, const int port, const char *str, const size_t bufferSize);
 
 #endif

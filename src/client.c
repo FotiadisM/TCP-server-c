@@ -8,13 +8,16 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 
+#include "../include/pipes.h"
+
+#define SOCK_BUFFER 100
+
 typedef struct sockaddr SA;
 typedef struct sockaddr_in SA_IN;
 
 static void *thread_run(void *val);
 
 int servPort;
-pthread_t *pool;
 char *servIP = NULL;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
@@ -22,9 +25,10 @@ pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 int main(int argc, char *argv[])
 {
     size_t len = 0;
+    pthread_t *pool;
     FILE *filePtr = NULL;
     int numThreads = 0, err = 0;
-    char *queryFile = NULL, **query_arr = NULL;
+    char *queryFile = NULL, *line = NULL;
 
     if (argc != 9)
     {
@@ -81,17 +85,6 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    if ((query_arr = malloc(numThreads * sizeof(char *))) == NULL)
-    {
-        perror("malloc");
-        return -1;
-    }
-
-    for (int i = 0; i < numThreads; i++)
-    {
-        query_arr[i] = NULL;
-    }
-
     if ((filePtr = fopen(queryFile, "r")) == NULL)
     {
         perror("fopen");
@@ -105,14 +98,14 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < numThreads; i++)
         {
-            if (getline(&query_arr[i], &len, filePtr) == -1)
+            if (getline(&line, &len, filePtr) == -1)
             {
                 break;
             }
             else
             {
                 count++;
-                if ((err = pthread_create(&pool[i], NULL, thread_run, (void *)query_arr[i])) != 0)
+                if ((err = pthread_create(&pool[i], NULL, thread_run, (void *)line)) != 0)
                 {
                     fprintf(stderr, "pthread_create() failed: %s\n", strerror(err));
                     return -1;
@@ -136,17 +129,12 @@ int main(int argc, char *argv[])
         printf("\n");
     }
 
-    for (int i = 0; i < numThreads; i++)
-    {
-        free(query_arr[i]);
-    }
-
     fclose(filePtr);
 
     free(pool);
+    free(line);
     free(queryFile);
     free(servIP);
-    free(query_arr);
 
     return 0;
 }
@@ -156,11 +144,9 @@ static void *thread_run(void *val)
     int sockfd;
     SA_IN servaddr;
     char *query = NULL;
-    char buffer[100] = {0};
+    char *buffer = NULL;
 
     query = (char *)val;
-
-    printf("que %s", query);
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
@@ -190,11 +176,20 @@ static void *thread_run(void *val)
         return NULL;
     }
 
-    write(sockfd, "i am the client", 100);
-    read(sockfd, buffer, 100);
-    printf("buf: %s\n", buffer);
+    if (encode(sockfd, query, SOCK_BUFFER) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+    }
+
+    if ((buffer = decode(sockfd, SOCK_BUFFER)) == NULL)
+    {
+        fprintf(stderr, "decode() failed");
+    }
+    printf("\n%s:\n%s\n", query, buffer);
 
     close(sockfd);
+
+    free(buffer);
 
     return NULL;
 }

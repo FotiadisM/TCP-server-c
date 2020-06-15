@@ -30,7 +30,7 @@ $(BDIR)/$(EXECUTABLE): $(OBJ)
 $(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes.c $(SDIR)/list.c $(SDIR)/patient.c $(SDIR)/date.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
-$(BDIR)/$(EXEC3): $(SDIR)/client.c
+$(BDIR)/$(EXEC3): $(SDIR)/client.c $(SDIR)/pipes.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
 .PHONY: clean run valgrind

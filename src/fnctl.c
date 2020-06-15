@@ -1,3 +1,5 @@
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,4 +165,216 @@ worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, con
     }
 
     return tmp_wp;
+}
+
+worker_ptr getWorker(const worker_ptr wp, const int numWorkers, const char *str)
+{
+    worker_ptr worker = wp;
+    string_nodePtr node = NULL;
+
+    if (str != NULL)
+    {
+        while (worker != NULL)
+        {
+            node = worker->countries;
+
+            while (node != NULL)
+            {
+                if (!strcmp(node->str, str))
+                {
+                    return worker;
+                }
+                node = node->next;
+            }
+            worker = worker->next;
+        }
+    }
+
+    return NULL;
+}
+
+// char *listCountries(const worker_ptr wp, const int numWorkers)
+// {
+//     string_nodePtr node = NULL;
+
+//     for (int i = 0; i < numWorkers; i++)
+//     {
+//         node = workers_array[i].countries_list;
+//         while (node != NULL)
+//         {
+//             printf("%s %u\n", node->str, workers_array[i].pid);
+//             node = node->next;
+//         }
+//         printf("\n");
+//     }
+
+//     return 0;
+// }
+
+int diseaseFrequency(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+{
+    worker_ptr worker = NULL;
+
+    if (p->we_wordc == 4 || p->we_wordc == 5)
+    {
+        if ((worker = getWorker(wp, numWorkers, p->we_wordv[4])) == NULL)
+        {
+            worker = wp;
+
+            while (worker != NULL)
+            {
+                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                {
+                    fprintf(stderr, "send_to() failed");
+                    return -1;
+                }
+                worker = worker->next;
+            }
+        }
+        else
+        {
+            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            {
+                fprintf(stderr, "send_to() failed");
+                return -1;
+            }
+        }
+    }
+    else
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int numFunction(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+{
+    worker_ptr worker = NULL;
+
+    if (p->we_wordc == 4 || p->we_wordc == 5)
+    {
+        if (p->we_wordc == 5)
+        {
+            if ((worker = getWorker(wp, numWorkers, p->we_wordv[4])) == NULL)
+            {
+                return -2;
+            }
+            else
+            {
+                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                {
+                    fprintf(stderr, "send_to() failed");
+                    return -1;
+                }
+            }
+        }
+        else
+        {
+            worker = wp;
+
+            while (worker != NULL)
+            {
+                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                {
+                    fprintf(stderr, "send_to() failed");
+                    return -1;
+                }
+                worker = worker->next;
+            }
+        }
+    }
+    else
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int topk_AgeRanges(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+{
+    worker_ptr worker = NULL;
+
+    if (p->we_wordc == 6)
+    {
+        if ((worker = getWorker(wp, numWorkers, p->we_wordv[2])) == NULL)
+        {
+            return -2;
+        }
+        else
+        {
+            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            {
+                fprintf(stderr, "send_to() failed");
+                return -1;
+            }
+        }
+    }
+    else
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int searchPatientRecord(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+{
+    worker_ptr worker = wp;
+
+    if (p->we_wordc == 2)
+    {
+        while (worker != NULL)
+        {
+            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            {
+                fprintf(stderr, "send_to() failed");
+                return -1;
+            }
+            worker = worker->next;
+        }
+    }
+    else
+    {
+        return -2;
+    }
+
+    return 0;
+}
+
+int send_to(const char *ip, const int port, const char *str, const size_t bufferSize)
+{
+    int sockfd = 0;
+    SA_IN servaddr;
+
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        perror("socket() failed");
+        return -1;
+    }
+
+    memset(&servaddr, 0, sizeof(SA_IN));
+
+    servaddr.sin_family = AF_INET;
+    if (inet_pton(AF_INET, ip, &servaddr.sin_addr) != 1)
+    {
+        perror("inet_pton");
+        return -1;
+    }
+    servaddr.sin_port = htons(port);
+
+    if (connect(sockfd, (SA *)&servaddr, sizeof(servaddr)) == -1)
+    {
+        perror("connect() failed");
+        return -1;
+    }
+
+    if (encode(sockfd, str, bufferSize) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+        return -1;
+    }
+
+    return sockfd;
 }

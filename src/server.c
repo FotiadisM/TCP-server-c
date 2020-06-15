@@ -22,22 +22,21 @@
 #define SOCK_BUFFER 100
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
-typedef struct sockaddr SA;
-typedef struct sockaddr_in SA_IN;
-
 static void *thread_run();
 static int server_init(uint16_t port, const int backlog);
 static int handle_query(const int socket);
 static int handle_statistic(const int socket);
 static void handler(int signum);
 
-extern char *optarg;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int numWorkers = 0;
+queue_ptr q = NULL;
+worker_ptr wp = NULL;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t wp_mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t smpl = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
-queue_ptr q = NULL;
-worker_ptr work_arr = NULL;
+
+extern char *optarg;
 volatile sig_atomic_t m_signal = 0;
 
 int main(int argc, char *argv[])
@@ -206,7 +205,7 @@ int main(int argc, char *argv[])
                     {
                         int val = 0;
 
-                        pthread_mutex_lock(&mutex);
+                        pthread_mutex_lock(&mtx);
                         val = enqueue(q, i, sockets_arr[i]);
 
                         if (val != -1 && val != -2)
@@ -216,7 +215,7 @@ int main(int argc, char *argv[])
                             pthread_cond_signal(&condition_var);
                         }
 
-                        pthread_mutex_unlock(&mutex);
+                        pthread_mutex_unlock(&mtx);
                     }
                 }
             }
@@ -236,7 +235,7 @@ int main(int argc, char *argv[])
 
     free(pool);
     queue_close(q);
-    worker_close(work_arr);
+    worker_close(wp);
 
     return 0;
 }
@@ -247,17 +246,17 @@ static void *thread_run()
     {
         queue_node_ptr node = NULL;
 
-        pthread_mutex_lock(&mutex);
+        pthread_mutex_lock(&mtx);
         if ((node = dequeue(q)) == NULL)
         {
             if (m_signal == SIGINT)
             {
-                pthread_mutex_unlock(&mutex);
+                pthread_mutex_unlock(&mtx);
                 break;
             }
-            pthread_cond_wait(&condition_var, &mutex);
+            pthread_cond_wait(&condition_var, &mtx);
         }
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&mtx);
 
         if (node != NULL)
         {
@@ -281,11 +280,22 @@ static void *thread_run()
 
 static int handle_query(const int socket)
 {
-    char buffer[2000] = {0};
+    int fd = 0;
+    char *buffer = NULL;
 
-    read(socket, buffer, 2000);
-    printf("msg: %s\n", buffer);
-    // write(socket, "i am the server", 100);
+    if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
+    {
+        fprintf(stderr, "decode() failed\n");
+        return -1;
+    }
+
+    if (encode(socket, "OK", SOCK_BUFFER) == -1)
+    {
+        fprintf(stderr, "encode() failed\n");
+        return -1;
+    }
+
+    free(buffer);
 
     close(socket);
 
@@ -326,11 +336,12 @@ static int handle_statistic(const int socket)
             }
 
             pthread_mutex_lock(&wp_mtx);
-            if ((work_arr = add_worker_country(work_arr, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer)) == NULL)
+            if ((wp = add_worker_country(wp, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer)) == NULL)
             {
                 fprintf(stderr, "add_worker_country() failed\n");
                 return -1;
             }
+            numWorkers++;
             pthread_mutex_unlock(&wp_mtx);
 
             free(buffer);
