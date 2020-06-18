@@ -1,10 +1,13 @@
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../include/fnctl.h"
+#include "../include/pipes.h"
 
 queue_ptr queue_init(const int bufferSize)
 {
@@ -167,7 +170,7 @@ worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, con
     return tmp_wp;
 }
 
-worker_ptr getWorker(const worker_ptr wp, const int numWorkers, const char *str)
+worker_ptr getWorker(const worker_ptr wp, const char *str)
 {
     worker_ptr worker = wp;
     string_nodePtr node = NULL;
@@ -193,80 +196,120 @@ worker_ptr getWorker(const worker_ptr wp, const int numWorkers, const char *str)
     return NULL;
 }
 
-// char *listCountries(const worker_ptr wp, const int numWorkers)
-// {
-//     string_nodePtr node = NULL;
-
-//     for (int i = 0; i < numWorkers; i++)
-//     {
-//         node = workers_array[i].countries_list;
-//         while (node != NULL)
-//         {
-//             printf("%s %u\n", node->str, workers_array[i].pid);
-//             node = node->next;
-//         }
-//         printf("\n");
-//     }
-
-//     return 0;
-// }
-
-int diseaseFrequency(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+int diseaseFrequency(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ)
 {
+    fd_set fdset;
+    char *tmp = NULL;
     worker_ptr worker = NULL;
+    int socketfd = 0, count = 0;
 
     if (p->we_wordc == 4 || p->we_wordc == 5)
     {
-        if ((worker = getWorker(wp, numWorkers, p->we_wordv[4])) == NULL)
+        if ((worker = getWorker(wp, p->we_wordv[4])) == NULL)
         {
             worker = wp;
-
             while (worker != NULL)
             {
-                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
                 {
                     fprintf(stderr, "send_to() failed");
                     return -1;
                 }
+
+                // FD_ZERO(&fdset);
+                // FD_SET(socketfd, &fdset);
+
+                // if (pselect(socketfd + 1, &fdset, NULL, NULL, NULL, NULL) == -1)
+                // {
+                //     perror("pselect");
+                // }
+
+                // sleep(1);
+                tmp = malloc(1000);
+                read(socketfd, tmp, 1000);
+                // if ((tmp = decode(socketfd, bufferSize)) == NULL)
+                // {
+                //     fprintf(stderr, "decode() failed");
+                //     return -1;
+                // }
+                printf("res: %s\n", tmp);
+
+                count += strtol(tmp, NULL, 10);
+
+                free(tmp);
+                close(socketfd);
+
                 worker = worker->next;
             }
+
+            *answ = malloc(100);
+            sprintf(*answ, "%d", count);
+            printf("multiple answ: %s\n", *answ);
         }
         else
         {
-            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
             {
                 fprintf(stderr, "send_to() failed");
                 return -1;
             }
+
+            FD_ZERO(&fdset);
+            FD_SET(socketfd, &fdset);
+
+            if (pselect(socketfd + 1, &fdset, NULL, NULL, NULL, NULL) == -1)
+            {
+                perror("pselect");
+            }
+
+            if ((*answ = decode(socketfd, bufferSize)) == NULL)
+            {
+                fprintf(stderr, "decode() failed");
+                return -1;
+            }
+            printf("single answ: %s\n", *answ);
+
+            close(socketfd);
         }
     }
     else
     {
-        return -1;
+        return 1;
     }
 
     return 0;
 }
 
-int numFunction(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+int numFunction(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ)
 {
+    int socketfd = 0;
+    char *tmp = NULL;
     worker_ptr worker = NULL;
+    string_nodePtr snode = NULL;
 
     if (p->we_wordc == 4 || p->we_wordc == 5)
     {
         if (p->we_wordc == 5)
         {
-            if ((worker = getWorker(wp, numWorkers, p->we_wordv[4])) == NULL)
+            if ((worker = getWorker(wp, p->we_wordv[4])) == NULL)
             {
-                return -2;
+                return 2;
             }
             else
             {
-                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
                 {
                     fprintf(stderr, "send_to() failed");
                     return -1;
                 }
+
+                if ((*answ = decode(socketfd, bufferSize)) == NULL)
+                {
+                    fprintf(stderr, "decode() failed");
+                    return -1;
+                }
+
+                close(socketfd);
             }
         }
         else
@@ -275,70 +318,138 @@ int numFunction(const worker_ptr wp, const int numWorkers, const char *str, cons
 
             while (worker != NULL)
             {
-                if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+                if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
                 {
                     fprintf(stderr, "send_to() failed");
                     return -1;
                 }
+
+                while (1)
+                {
+                    if ((tmp = decode(socketfd, bufferSize)) == NULL)
+                    {
+                        fprintf(stderr, "decode() failed");
+                        return -1;
+                    }
+
+                    if (!strcmp(tmp, "OK"))
+                    {
+                        free(tmp);
+                        break;
+                    }
+                    add_stringNode(snode, tmp);
+
+                    free(tmp);
+                }
+
+                close(socketfd);
+
                 worker = worker->next;
             }
+
+            clear_stringNode(snode);
         }
     }
     else
     {
-        return -1;
+        return 1;
     }
 
     return 0;
 }
 
-int topk_AgeRanges(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+int topk_AgeRanges(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ)
 {
+    int socketfd = 0;
     worker_ptr worker = NULL;
+    string_nodePtr snode = NULL;
 
     if (p->we_wordc == 6)
     {
-        if ((worker = getWorker(wp, numWorkers, p->we_wordv[2])) == NULL)
+        if ((worker = getWorker(wp, p->we_wordv[2])) == NULL)
         {
-            return -2;
+            return 2;
         }
         else
         {
-            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            char *tmp = NULL;
+
+            if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
             {
                 fprintf(stderr, "send_to() failed");
                 return -1;
             }
+
+            while (1)
+            {
+                if ((tmp = decode(socketfd, bufferSize)) == NULL)
+                {
+                    fprintf(stderr, "decode() failed");
+                    return -1;
+                }
+
+                if (!strcmp(tmp, "OK"))
+                {
+                    free(tmp);
+                    break;
+                }
+
+                add_stringNode(snode, tmp);
+            }
+
+            close(socketfd);
         }
     }
     else
     {
-        return -1;
+        return 1;
     }
+
+    clear_stringNode(snode);
 
     return 0;
 }
 
-int searchPatientRecord(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize)
+int searchPatientRecord(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ)
 {
+    int socketfd = 0;
+    char *tmp = NULL;
     worker_ptr worker = wp;
+    string_nodePtr snode = NULL;
 
     if (p->we_wordc == 2)
     {
         while (worker != NULL)
         {
-            if (send_to(worker->ip, worker->port, str, bufferSize) == -1)
+            if ((socketfd = send_to(worker->ip, worker->port, str, bufferSize)) == -1)
             {
                 fprintf(stderr, "send_to() failed");
                 return -1;
             }
+
+            if ((tmp = decode(socketfd, bufferSize)) == NULL)
+            {
+                fprintf(stderr, "decode() failed");
+                return -1;
+            }
+
+            if (strcmp(tmp, "OK"))
+            {
+                add_stringNode(snode, tmp);
+            }
+
+            free(tmp);
+            close(socketfd);
+
             worker = worker->next;
         }
     }
     else
     {
-        return -2;
+        return 1;
     }
+
+    clear_stringNode(snode);
 
     return 0;
 }

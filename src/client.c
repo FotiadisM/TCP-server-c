@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     pthread_t *pool;
     FILE *filePtr = NULL;
     int numThreads = 0, err = 0;
-    char *queryFile = NULL, *line = NULL;
+    char *queryFile = NULL, **lines = NULL;
 
     if (argc != 9)
     {
@@ -79,6 +79,17 @@ int main(int argc, char *argv[])
         }
     }
 
+    if ((lines = malloc(numThreads * sizeof(char *))) == NULL)
+    {
+        perror("malloc");
+        return -1;
+    }
+
+    for (int i = 0; i < numThreads; i++)
+    {
+        lines[i] = NULL;
+    }
+
     if ((pool = malloc(numThreads * sizeof(pthread_t))) == NULL)
     {
         perror("malloc");
@@ -98,14 +109,14 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < numThreads; i++)
         {
-            if (getline(&line, &len, filePtr) == -1)
+            if (getline(&lines[i], &len, filePtr) == -1)
             {
                 break;
             }
             else
             {
                 count++;
-                if ((err = pthread_create(&pool[i], NULL, thread_run, (void *)line)) != 0)
+                if ((err = pthread_create(&pool[i], NULL, thread_run, (void *)lines[i])) != 0)
                 {
                     fprintf(stderr, "pthread_create() failed: %s\n", strerror(err));
                     return -1;
@@ -129,12 +140,17 @@ int main(int argc, char *argv[])
         printf("\n");
     }
 
-    fclose(filePtr);
+    for (int i = 0; i < numThreads; i++)
+    {
+        free(lines[i]);
+    }
 
+    free(lines);
     free(pool);
-    free(line);
     free(queryFile);
     free(servIP);
+
+    fclose(filePtr);
 
     return 0;
 }
@@ -147,6 +163,7 @@ static void *thread_run(void *val)
     char *buffer = NULL;
 
     query = (char *)val;
+    strtok(query, "\n");
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {

@@ -28,7 +28,6 @@ static int handle_query(const int socket);
 static int handle_statistic(const int socket);
 static void handler(int signum);
 
-int numWorkers = 0;
 queue_ptr q = NULL;
 worker_ptr wp = NULL;
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -280,8 +279,9 @@ static void *thread_run()
 
 static int handle_query(const int socket)
 {
-    int fd = 0;
-    char *buffer = NULL;
+    int flag = 0;
+    char *buffer = NULL, *str = NULL;
+    wordexp_t p;
 
     if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
     {
@@ -289,13 +289,73 @@ static int handle_query(const int socket)
         return -1;
     }
 
-    if (encode(socket, "OK", SOCK_BUFFER) == -1)
+    if (wordexp(buffer, &p, 0))
     {
-        fprintf(stderr, "encode() failed\n");
+        fprintf(stderr, "wordexp() failed\n");
         return -1;
     }
 
+    if (!strcmp(p.we_wordv[0], "/diseaseFrequency"))
+    {
+        flag = diseaseFrequency(wp, buffer, &p, SOCK_BUFFER, &str);
+    }
+    else if (!strcmp(p.we_wordv[0], "/topk-AgeRanges"))
+    {
+        flag = topk_AgeRanges(wp, buffer, &p, SOCK_BUFFER, &str);
+    }
+    else if (!strcmp(p.we_wordv[0], "/searchPatientRecord"))
+    {
+        flag = searchPatientRecord(wp, buffer, &p, SOCK_BUFFER, &str);
+    }
+    else if (!strcmp(p.we_wordv[0], "/numPatientAdmissions"))
+    {
+        flag = searchPatientRecord(wp, buffer, &p, SOCK_BUFFER, &str);
+    }
+    else if (!strcmp(p.we_wordv[0], "/numPatientDischarges"))
+    {
+        flag = numFunction(wp, buffer, &p, SOCK_BUFFER, &str);
+    }
+    else
+    {
+        flag = 1;
+    }
+
+    switch (flag)
+    {
+    case -1:
+        if (encode(socket, "Error 500: Internal Server Error", SOCK_BUFFER) == -1)
+        {
+            fprintf(stderr, "encode() failed\n");
+            return -1;
+        }
+        return -1;
+    case 0:
+        if (encode(socket, str, SOCK_BUFFER) == -1)
+        {
+            fprintf(stderr, "encode() failed\n");
+            return -1;
+        }
+
+        free(str);
+        break;
+    case 1:
+        if (encode(socket, "Error 400: Bad Request", SOCK_BUFFER) == -1)
+        {
+            fprintf(stderr, "encode() failed\n");
+            return -1;
+        }
+        break;
+    case 2:
+        if (encode(socket, "Error 501: Country Not Registered", SOCK_BUFFER) == -1)
+        {
+            fprintf(stderr, "encode() failed\n");
+            return -1;
+        }
+        break;
+    }
+
     free(buffer);
+    wordfree(&p);
 
     close(socket);
 
@@ -314,13 +374,26 @@ static int handle_statistic(const int socket)
 
     if (!strcmp(buffer, "HANDSHAKE"))
     {
-        SA_IN clientaddr;
-        socklen_t sa_len = sizeof(SA_IN);
+        int port;
+        char *ip = NULL;
 
-        memset(&clientaddr, 0, sizeof(SA_IN));
-        getsockname(socket, (SA *)&clientaddr, &sa_len);
+        if ((ip = decode(socket, SOCK_BUFFER)) == NULL)
+        {
+            fprintf(stderr, "decode() failed\n");
+            return -1;
+        }
 
         free(buffer);
+        if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
+        {
+            fprintf(stderr, "decode() failed\n");
+            return -1;
+        }
+
+        port = strtol(buffer, NULL, 10);
+        free(buffer);
+        printf("worker --> ip:%s, port: %d\n", ip, port);
+
         while (1)
         {
             if ((buffer = decode(socket, SOCK_BUFFER)) == NULL)
@@ -336,16 +409,17 @@ static int handle_statistic(const int socket)
             }
 
             pthread_mutex_lock(&wp_mtx);
-            if ((wp = add_worker_country(wp, inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), buffer)) == NULL)
+            if ((wp = add_worker_country(wp, ip, port, buffer)) == NULL)
             {
                 fprintf(stderr, "add_worker_country() failed\n");
                 return -1;
             }
-            numWorkers++;
             pthread_mutex_unlock(&wp_mtx);
 
             free(buffer);
         }
+
+        free(ip);
     }
     else
     {

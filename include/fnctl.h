@@ -46,11 +46,11 @@ worker_ptr add_worker(worker_ptr wp, const char *ip, const int port);
 void worker_close(worker_ptr wp);
 worker_ptr add_worker_country(worker_ptr wp, const char *ip, const int port, const char *country);
 
-worker_ptr getWorker(const worker_ptr wp, const int numWorkers, const char *str);
-int searchPatientRecord(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
-int topk_AgeRanges(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
-int numFunction(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
-int diseaseFrequency(const worker_ptr wp, const int numWorkers, const char *str, const wordexp_t *p, const size_t bufferSize);
+worker_ptr getWorker(const worker_ptr wp, const char *str);
+int searchPatientRecord(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ);
+int topk_AgeRanges(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ);
+int numFunction(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ);
+int diseaseFrequency(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ);
 
 int send_to(const char *ip, const int port, const char *str, const size_t bufferSize);
 

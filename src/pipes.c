@@ -57,7 +57,7 @@ int encode(const int fd, const char *buffer, const size_t bufferSize)
     {
         if (write(fd, str + (i * bufferSize), bufferSize) == -1)
         {
-            perror("write");
+            perror("write() failed");
             return -1;
         }
     }
@@ -66,7 +66,7 @@ int encode(const int fd, const char *buffer, const size_t bufferSize)
     {
         if (write(fd, str + (str_size - str_size % bufferSize), str_size % bufferSize) == -1)
         {
-            perror("write");
+            perror("write() failed");
             return -1;
         }
     }
@@ -75,7 +75,7 @@ int encode(const int fd, const char *buffer, const size_t bufferSize)
     {
         if (write(fd, buffer + (i * bufferSize), bufferSize) == -1)
         {
-            perror("write");
+            perror("write() failed");
             return -1;
         }
     }
@@ -84,7 +84,7 @@ int encode(const int fd, const char *buffer, const size_t bufferSize)
     {
         if (write(fd, buffer + (buffer_len - buffer_len % bufferSize), buffer_len % bufferSize) == -1)
         {
-            perror("write");
+            perror("write() failed");
             return -1;
         }
     }
@@ -109,7 +109,7 @@ char *decode(const int fd, const size_t bufferSize)
     {
         if (read(fd, buffer, bufferSize) == -1)
         {
-            perror("write");
+            perror("read() failed");
             return NULL;
         }
         memcpy(str + (i * bufferSize), buffer, bufferSize);
@@ -119,7 +119,7 @@ char *decode(const int fd, const size_t bufferSize)
     {
         if (read(fd, buffer, str_size % bufferSize) == -1)
         {
-            perror("write");
+            perror("read() failed");
             return NULL;
         }
         memcpy(str + (str_size / bufferSize) * bufferSize, buffer, str_size - (str_size / bufferSize) * bufferSize);
@@ -137,7 +137,7 @@ char *decode(const int fd, const size_t bufferSize)
     {
         if (read(fd, buffer, bufferSize) == -1)
         {
-            perror("write");
+            perror("read() failed");
             return NULL;
         }
         memcpy(r_buffer + (i * bufferSize), buffer, bufferSize);
@@ -147,7 +147,7 @@ char *decode(const int fd, const size_t bufferSize)
     {
         if (read(fd, buffer, r_buffer_size % bufferSize) == -1)
         {
-            perror("write");
+            perror("read() failed");
             return NULL;
         }
         memcpy(r_buffer + (r_buffer_size / bufferSize) * bufferSize, buffer, r_buffer_size - (r_buffer_size / bufferSize) * bufferSize);

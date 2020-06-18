@@ -31,7 +31,7 @@ static void handler(int signum);
 static void handle_sigint(const string_nodePtr countries, const int count, const int err);
 static int handle_sigusr1(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir);
 
-static int handsake(const char *ip, const int port, const string_nodePtr countries);
+static int handsake(const char *ip, const int port, const string_nodePtr countries, const char *myIp, const int myPort);
 static int diseaseFrequency(const int w_fd, const size_t bufferSize, const char *str, const HashTablePtr ht);
 static int topk_AgeRanges(const int w_fd, const size_t bufferSize, const char *str, const ListPtr list);
 static int searchPatientRecord(wordexp_t *p, const int w_fd, const size_t bufferSize, const ListPtr list);
@@ -524,7 +524,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
     getsockname(sockfd, (SA *)&servaddr, &sa_len);
 
     printf("Worker listening on port: %d\n", ntohs(servaddr.sin_port));
-    if (handsake(serverIP, serverPort, countries) == -1)
+    if (handsake(serverIP, serverPort, countries, inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port)) == -1)
     {
         fprintf(stderr, "handsake() failed\n");
     }
@@ -570,8 +570,19 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
                     perror("accept() failed");
                     exit(EXIT_FAILURE);
                 }
-                str = decode(answfd, bufferSize);
-                printf("web req\n");
+                printf("new connection, fd: %d\n", answfd);
+                if ((str = decode(answfd, bufferSize)) == NULL)
+                {
+                    fprintf(stderr, "decode() failed");
+                }
+                char hello[12] = {0};
+                sprintf(hello, "%d", 10);
+                // diseaseFrequency(answfd, bufferSize, str, h1);
+                // sleep(4);
+                // if (encode(answfd, hello, 100) == -1)
+                // {
+                //     fprintf(stderr, "encode() failed");
+                // }
             }
 
             wordexp(str, &p, 0);
@@ -651,9 +662,10 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
     return 0;
 }
 
-static int handsake(const char *ip, const int port, const string_nodePtr countries)
+static int handsake(const char *ip, const int port, const string_nodePtr countries, const char *myIp, const int myPort)
 {
     int sockfd;
+    char port_str[10];
     SA_IN servaddr;
     string_nodePtr node = countries;
 
@@ -673,8 +685,6 @@ static int handsake(const char *ip, const int port, const string_nodePtr countri
     }
     servaddr.sin_port = htons(port);
 
-    printf("ip: %s, port: %d", ip, port);
-
     if (connect(sockfd, (SA *)&servaddr, sizeof(SA_IN)) == -1)
     {
         perror("connect() failed");
@@ -682,6 +692,20 @@ static int handsake(const char *ip, const int port, const string_nodePtr countri
     }
 
     if (encode(sockfd, "HANDSHAKE", 100) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+        return -1;
+    }
+
+    if (encode(sockfd, myIp, 100) == -1)
+    {
+        fprintf(stderr, "encode() failed");
+        return -1;
+    }
+
+    sprintf(port_str, "%d", myPort);
+
+    if (encode(sockfd, port_str, 100) == -1)
     {
         fprintf(stderr, "encode() failed");
         return -1;
@@ -730,7 +754,14 @@ static int diseaseFrequency(const int w_fd, const size_t bufferSize, const char 
     }
 
     sprintf(answ, "%d", AVLNode_countPatients(tree->root, p.we_wordv[1], p.we_wordv[4], d1, d2));
-    encode(w_fd, answ, bufferSize);
+    printf("return: %s at: %d\n", answ, w_fd);
+
+    // if (encode(w_fd, answ, bufferSize) == -1)
+    // {
+    //     fprintf(stderr, "encode() failed");
+    //     return -1;
+    // }
+    write(w_fd, answ, 1000);
 
     free(d1);
     free(d2);

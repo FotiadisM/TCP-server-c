@@ -725,7 +725,6 @@ static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, c
             }
             else
             {
-                char *str = NULL;
                 string_nodePtr node = workers_array[i].countries_list;
 
                 workers_array[i].pid = pid;
@@ -746,17 +745,6 @@ static int handle_sigchild(worker_infoPtr workers_array, const int numWorkers, c
                     node = node->next;
                 }
                 encode(workers_array[i].w_fd, "OK", bufferSize);
-
-                while (1)
-                {
-                    str = decode(workers_array[i].r_fd, bufferSize);
-                    if (!strcmp(str, "OK"))
-                    {
-                        free(str);
-                        break;
-                    }
-                    free(str);
-                }
             }
 
             break;
