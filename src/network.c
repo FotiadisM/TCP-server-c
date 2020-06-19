@@ -46,12 +46,6 @@ char *my_receive(const int socket)
     }
 
     len = strtol(str, NULL, 10);
-    // printf("len %ld\n", len);
-    // if ((len == LONG_MIN) || (len = LONG_MAX))
-    // {
-    //     perror("strtol() failed");
-    //     return NULL;
-    // }
 
     if ((bufffer = malloc(len)) == NULL)
     {

@@ -241,7 +241,6 @@ int diseaseFrequency(const worker_ptr wp, const char *str, const wordexp_t *p, c
                 return -1;
             }
 
-            // sleep(1);
             if ((*answ = my_receive(socketfd)) == NULL)
             {
                 fprintf(stderr, "decode() failed");
@@ -283,7 +282,6 @@ int numFunction(const worker_ptr wp, const char *str, const wordexp_t *p, const 
                     return -1;
                 }
 
-                sleep(1);
                 if ((*answ = my_receive(socketfd)) == NULL)
                 {
                     fprintf(stderr, "decode() failed");
@@ -307,7 +305,6 @@ int numFunction(const worker_ptr wp, const char *str, const wordexp_t *p, const 
 
                 while (1)
                 {
-                    sleep(1);
                     if ((tmp = my_receive(socketfd)) == NULL)
                     {
                         fprintf(stderr, "decode() failed");
@@ -370,7 +367,6 @@ int topk_AgeRanges(const worker_ptr wp, const char *str, const wordexp_t *p, con
 
             while (1)
             {
-                // sleep(1);
                 if ((tmp = my_receive(socketfd)) == NULL)
                 {
                     fprintf(stderr, "decode() failed");

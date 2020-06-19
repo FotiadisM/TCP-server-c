@@ -23,7 +23,7 @@ static void handler(int signum);
 static void Parent_handleSignals(struct sigaction *act, const int t_siganl);
 
 static int DA_DevideWork(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const char *input_dir);
-static int DA_main(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize);
+// static int DA_main(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize);
 static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir);
 
 static int listCountries(const worker_infoPtr workers_array, const int numWorkers);
@@ -151,67 +151,67 @@ static int DA_DevideWork(worker_infoPtr workers_array, const int numWorkers, con
     return 0;
 }
 
-static int DA_main(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize)
-{
-    fd_set fds;
-    FILE *filePtr = NULL;
-    int maxfd = 0, count = 0;
-    char *str = NULL;
+// static int DA_main(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize)
+// {
+//     fd_set fds;
+//     FILE *filePtr = NULL;
+//     int maxfd = 0, count = 0;
+//     char *str = NULL;
 
-    if ((filePtr = fopen("./logs/stats.txt", "w+")) == NULL)
-    {
-        perror("open file");
-        return -1;
-    }
+//     if ((filePtr = fopen("./logs/stats.txt", "w+")) == NULL)
+//     {
+//         perror("open file");
+//         return -1;
+//     }
 
-    while (1)
-    {
-        FD_ZERO(&fds);
+//     while (1)
+//     {
+//         FD_ZERO(&fds);
 
-        for (int i = 0; i < numWorkers; i++)
-        {
-            FD_SET(workers_array[i].r_fd, &fds);
+//         for (int i = 0; i < numWorkers; i++)
+//         {
+//             FD_SET(workers_array[i].r_fd, &fds);
 
-            if (workers_array[i].r_fd > maxfd)
-            {
-                maxfd = workers_array[i].r_fd;
-            }
-        }
+//             if (workers_array[i].r_fd > maxfd)
+//             {
+//                 maxfd = workers_array[i].r_fd;
+//             }
+//         }
 
-        if (pselect(maxfd + 1, &fds, NULL, NULL, NULL, NULL) == -1)
-        {
-            perror("select()");
-        }
+//         if (pselect(maxfd + 1, &fds, NULL, NULL, NULL, NULL) == -1)
+//         {
+//             perror("select()");
+//         }
 
-        for (int i = 0; i < numWorkers; i++)
-        {
-            if (FD_ISSET(workers_array[i].r_fd, &fds))
-            {
-                str = decode(workers_array[i].r_fd, bufferSize);
+//         for (int i = 0; i < numWorkers; i++)
+//         {
+//             if (FD_ISSET(workers_array[i].r_fd, &fds))
+//             {
+//                 str = decode(workers_array[i].r_fd, bufferSize);
 
-                if (!strcmp(str, "OK"))
-                {
-                    count++;
-                }
-                else
-                {
-                    // fprintf(filePtr, "%s", str);
-                }
+//                 if (!strcmp(str, "OK"))
+//                 {
+//                     count++;
+//                 }
+//                 else
+//                 {
+//                     // fprintf(filePtr, "%s", str);
+//                 }
 
-                free(str);
-            }
-        }
+//                 free(str);
+//             }
+//         }
 
-        if (count == numWorkers)
-        {
-            break;
-        }
-    }
+//         if (count == numWorkers)
+//         {
+//             break;
+//         }
+//     }
 
-    fclose(filePtr);
+//     fclose(filePtr);
 
-    return 0;
-}
+//     return 0;
+// }
 
 static int DA_wait_input(worker_infoPtr workers_array, const int numWorkers, const size_t bufferSize, const int serverPort, const char *serverIP, char *input_dir)
 {

@@ -46,3 +46,5 @@ clean:
 	rm -f pipes/r_* pipes/w_*
 	rm -f $(ODIR)/*.o
 	rm -f $(BDIR)/$(EXECUTABLE)
+	rm -f $(BDIR)/$(EXEC2)
+	rm -f $(BDIR)/$(EXEC3)

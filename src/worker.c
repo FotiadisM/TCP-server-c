@@ -918,7 +918,6 @@ static int numFunctions(const int w_fd, const size_t bufferSize, const char *str
                             char send[100];
                             sprintf(send, "%s %d", node->entries[j]->key, count);
                             encode(w_fd, send, bufferSize);
-                            // printf("%s %d\n", node->entries[j]->key, count);
                         }
                     }
                     node = node->next;
@@ -957,7 +956,6 @@ static int numFunctions(const int w_fd, const size_t bufferSize, const char *str
                             char send[100];
                             sprintf(send, "%s %d", node->entries[j]->key, count);
                             encode(w_fd, send, bufferSize);
-                            // printf("%s %d\n", node->entries[j]->key, count);
                         }
                     }
                     node = node->next;
