@@ -1,2 +1,8 @@
 /diseaseFrequency Flu 00-00-1980 00-00-2040 Greece
 /diseaseFrequency Flu 00-00-1980 00-00-2040
+/topk-AgeRanges 3 Greece Flu 00-00-1980 00-00-2040
+/searchPatientRecord 2
+/numPatientAdmissions Flu 00-00-1980 00-00-2040
+/numPatientAdmissions Flu 00-00-1980 00-00-2040 Greece
+/numPatientDischarges Flu 00-00-1980 00-00-2040
+/numPatientDischarges Flu 00-00-1980 00-00-2040 Greece

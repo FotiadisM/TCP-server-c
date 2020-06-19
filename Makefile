@@ -13,10 +13,10 @@ EXECUTABLE = diseaseAggregator
 EXEC2 = whoServer
 EXEC3 = whoClient
 
-_DEPS = diseaseAggregator.h worker.h pipes.h stats.h list.h hashTable.h AVL.h patient.h date.h 
+_DEPS = diseaseAggregator.h worker.h pipes.h stats.h list.h hashTable.h AVL.h patient.h date.h network.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = main.o diseaseAggregator.o worker.o pipes.o stats.o list.o hashTable.o AVL.o patient.o date.o
+_OBJ = main.o diseaseAggregator.o worker.o pipes.o stats.o list.o hashTable.o AVL.o patient.o date.o network.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: $(SDIR)/%.c $(DEPS)
@@ -27,10 +27,10 @@ all: $(BDIR)/$(EXECUTABLE) $(BDIR)/$(EXEC2) $(BDIR)/$(EXEC3)
 $(BDIR)/$(EXECUTABLE): $(OBJ)
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes.c $(SDIR)/list.c $(SDIR)/patient.c $(SDIR)/date.c
+$(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes.c $(SDIR)/network.c $(SDIR)/list.c $(SDIR)/patient.c $(SDIR)/date.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
-$(BDIR)/$(EXEC3): $(SDIR)/client.c $(SDIR)/pipes.c
+$(BDIR)/$(EXEC3): $(SDIR)/client.c $(SDIR)/pipes.c $(SDIR)/network.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
 .PHONY: clean run valgrind

@@ -53,5 +53,6 @@ int numFunction(const worker_ptr wp, const char *str, const wordexp_t *p, const 
 int diseaseFrequency(const worker_ptr wp, const char *str, const wordexp_t *p, const size_t bufferSize, char **answ);
 
 int send_to(const char *ip, const int port, const char *str, const size_t bufferSize);
+char *combine(string_nodePtr snode);
 
 #endif

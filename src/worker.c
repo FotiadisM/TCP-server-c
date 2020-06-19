@@ -754,14 +754,12 @@ static int diseaseFrequency(const int w_fd, const size_t bufferSize, const char 
     }
 
     sprintf(answ, "%d", AVLNode_countPatients(tree->root, p.we_wordv[1], p.we_wordv[4], d1, d2));
-    printf("return: %s at: %d\n", answ, w_fd);
 
-    // if (encode(w_fd, answ, bufferSize) == -1)
-    // {
-    //     fprintf(stderr, "encode() failed");
-    //     return -1;
-    // }
-    write(w_fd, answ, 1000);
+    if (encode(w_fd, answ, bufferSize) == -1)
+    {
+        fprintf(stderr, "encode() failed\n");
+        return -1;
+    }
 
     free(d1);
     free(d2);
@@ -810,22 +808,22 @@ static int topk_AgeRanges(const int w_fd, const size_t bufferSize, const char *s
 
         if (ag->ag1 >= ag->ag2 && ag->ag1 >= ag->ag3 && ag->ag1 >= ag->ag4)
         {
-            sprintf(str, "0-20: %f%%\n", ((float)ag->ag1 / total) * 100);
+            sprintf(str, "0-20: %f%%", ((float)ag->ag1 / total) * 100);
             ag->ag1 = 0;
         }
         else if (ag->ag2 >= ag->ag1 && ag->ag2 >= ag->ag3 && ag->ag2 >= ag->ag4)
         {
-            sprintf(str, "21-40: %f%%\n", ((float)ag->ag2 / total) * 100);
+            sprintf(str, "21-40: %f%%", ((float)ag->ag2 / total) * 100);
             ag->ag2 = 0;
         }
         else if (ag->ag3 >= ag->ag1 && ag->ag3 >= ag->ag2 && ag->ag3 >= ag->ag4)
         {
-            sprintf(str, "41-60: %f%%\n", ((float)ag->ag3 / total) * 100);
+            sprintf(str, "41-60: %f%%", ((float)ag->ag3 / total) * 100);
             ag->ag3 = 0;
         }
         else
         {
-            sprintf(str, "61+: %f%%\n", ((float)ag->ag4 / total) * 100);
+            sprintf(str, "61+: %f%%", ((float)ag->ag4 / total) * 100);
             ag->ag4 = 0;
         }
 
@@ -918,7 +916,7 @@ static int numFunctions(const int w_fd, const size_t bufferSize, const char *str
                                 ptr = ptr->next;
                             }
                             char send[100];
-                            sprintf(send, "%s %d\n", node->entries[j]->key, count);
+                            sprintf(send, "%s %d", node->entries[j]->key, count);
                             encode(w_fd, send, bufferSize);
                             // printf("%s %d\n", node->entries[j]->key, count);
                         }
@@ -957,7 +955,7 @@ static int numFunctions(const int w_fd, const size_t bufferSize, const char *str
                                 ptr = ptr->next;
                             }
                             char send[100];
-                            sprintf(send, "%s %d\n", node->entries[j]->key, count);
+                            sprintf(send, "%s %d", node->entries[j]->key, count);
                             encode(w_fd, send, bufferSize);
                             // printf("%s %d\n", node->entries[j]->key, count);
                         }
@@ -1010,9 +1008,8 @@ static int numFunctions(const int w_fd, const size_t bufferSize, const char *str
             }
         }
 
-        // printf("%s %d\n", p.we_wordv[4], count);
         char send[100];
-        sprintf(send, "%s %d\n", p.we_wordv[4], count);
+        sprintf(send, "%s %d", p.we_wordv[4], count);
         encode(w_fd, send, bufferSize);
     }
 

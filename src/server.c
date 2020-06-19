@@ -309,7 +309,7 @@ static int handle_query(const int socket)
     }
     else if (!strcmp(p.we_wordv[0], "/numPatientAdmissions"))
     {
-        flag = searchPatientRecord(wp, buffer, &p, SOCK_BUFFER, &str);
+        flag = numFunction(wp, buffer, &p, SOCK_BUFFER, &str);
     }
     else if (!strcmp(p.we_wordv[0], "/numPatientDischarges"))
     {
@@ -441,6 +441,11 @@ static int server_init(uint16_t port, const int backlog)
     {
         perror("socket() failed");
         return -1;
+    }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) == -1)
+    {
+        fprintf(stderr, "setsockopt(SO_REUSEADDR) failed");
     }
 
     memset(&servaddr, 0, sizeof(SA_IN));
