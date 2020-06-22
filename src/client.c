@@ -20,6 +20,7 @@ static void *thread_run(void *val);
 int servPort;
 char *servIP = NULL;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t iomtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
 
 int main(int argc, char *argv[])
@@ -163,7 +164,10 @@ static void *thread_run(void *val)
     char *buffer = NULL;
 
     query = (char *)val;
-    strtok(query, "\n");
+    if (strcmp(query, "\n"))
+    {
+        strtok(query, "\n");
+    }
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
     {
@@ -202,7 +206,10 @@ static void *thread_run(void *val)
     {
         fprintf(stderr, "decode() failed");
     }
+
+    pthread_mutex_lock(&iomtx);
     printf("\n%s:\n%s\n", query, buffer);
+    pthread_mutex_unlock(&iomtx);
 
     close(sockfd);
 

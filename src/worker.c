@@ -31,7 +31,7 @@ static void handler(int signum);
 static void handle_sigint(const string_nodePtr countries, const int count, const int err);
 static int handle_sigusr1(ListPtr list, HashTablePtr h1, HashTablePtr h2, const string_nodePtr countries, string_nodePtr dates, const char *input_dir);
 
-static int handsake(const char *ip, const int port, const string_nodePtr countries, const char *myIp, const int myPort);
+static int handsake(const char *ip, const int port, const string_nodePtr countries, const int myPort);
 static int diseaseFrequency(const int w_fd, const size_t bufferSize, const char *str, const HashTablePtr ht);
 static int topk_AgeRanges(const int w_fd, const size_t bufferSize, const char *str, const ListPtr list);
 static int searchPatientRecord(wordexp_t *p, const int w_fd, const size_t bufferSize, const ListPtr list);
@@ -524,7 +524,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
     getsockname(sockfd, (SA *)&servaddr, &sa_len);
 
     printf("Worker listening on port: %d\n", ntohs(servaddr.sin_port));
-    if (handsake(serverIP, serverPort, countries, inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port)) == -1)
+    if (handsake(serverIP, serverPort, countries, ntohs(servaddr.sin_port)) == -1)
     {
         fprintf(stderr, "handsake() failed\n");
     }
@@ -662,7 +662,7 @@ static int Worker_wait_input(const int w_fd, const int r_fd, const size_t buffer
     return 0;
 }
 
-static int handsake(const char *ip, const int port, const string_nodePtr countries, const char *myIp, const int myPort)
+static int handsake(const char *ip, const int port, const string_nodePtr countries, const int myPort)
 {
     int sockfd;
     char port_str[10];
@@ -692,12 +692,6 @@ static int handsake(const char *ip, const int port, const string_nodePtr countri
     }
 
     if (encode(sockfd, "HANDSHAKE", 100) == -1)
-    {
-        fprintf(stderr, "encode() failed");
-        return -1;
-    }
-
-    if (encode(sockfd, myIp, 100) == -1)
     {
         fprintf(stderr, "encode() failed");
         return -1;

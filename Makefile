@@ -9,7 +9,7 @@ ODIR = build
 IDIR = include
 SDIR = src
 
-EXECUTABLE = diseaseAggregator
+EXECUTABLE = master
 EXEC2 = whoServer
 EXEC3 = whoClient
 
@@ -33,13 +33,25 @@ $(BDIR)/$(EXEC2): $(SDIR)/server.c $(SDIR)/fnctl.c $(IDIR)/fnctl.h $(SDIR)/pipes
 $(BDIR)/$(EXEC3): $(SDIR)/client.c $(SDIR)/pipes.c $(SDIR)/network.c
 	$(CC) $(OFLAGS) $(CFLAGS) $^ -o $@ -lpthread
 
-.PHONY: clean run valgrind
+.PHONY: clean run1 run2 run3 valgrind1 valgrind2 valgrind3
 
-run:
+run1:
+	./$(BDIR)/$(EXEC2) -q 4000 -s 4010 -w 10 -b 10
+
+run2:
 	./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -i ./data
 
-valgrind:
+run3:
+	./$(BDIR)/$(EXEC3) -q assets/queries.txt -w 2 -sp 4000 -sip 127.0.0.1
+
+valgrind1:
+	valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all ./$(BDIR)/$(EXEC2) -q 4000 -s 4010 -w 10 -b 10
+
+valgrind2:
 	valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all ./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -s 127.0.0.1 -p 4010 -i ./data 
+
+valgrind3:
+	valgrind --leak-check=full --track-origins=yes --show-leak-kinds=all ./$(BDIR)/$(EXEC3) -q assets/queries.txt -w 2 -sp 4000 -sip 127.0.0.1
 
 clean:
 	rm -f logs/log*

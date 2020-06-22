@@ -207,7 +207,20 @@ int main(int argc, char *argv[])
                         pthread_mutex_lock(&mtx);
                         val = enqueue(q, i, sockets_arr[i]);
 
-                        if (val != -1 && val != -2)
+                        if (val == -1)
+                        {
+                            fprintf(stderr, "enqueue() failed");
+                        }
+                        else if (val == -2)
+                        {
+                            if (encode(i, "Server is busy", SOCK_BUFFER) == -1)
+                            {
+                                fprintf(stderr, "encode() failed");
+                            }
+                            close(i);
+                            FD_CLR(i, &cur_fds);
+                        }
+                        else
                         {
                             sockets_arr[i] = 0;
                             FD_CLR(i, &cur_fds);
@@ -376,10 +389,18 @@ static int handle_statistic(const int socket)
     {
         int port;
         char *ip = NULL;
+        SA_IN waddr;
+        socklen_t len = sizeof(SA_IN);
 
-        if ((ip = decode(socket, SOCK_BUFFER)) == NULL)
+        if (getsockname(socket, (SA *)&waddr, &len) == -1)
         {
-            fprintf(stderr, "decode() failed\n");
+            perror("getsockname() failed");
+            return -1;
+        }
+
+        if ((ip = strdup(inet_ntoa(waddr.sin_addr))) == NULL)
+        {
+            perror("strdup or inet_ntoa faile");
             return -1;
         }
 
@@ -389,8 +410,8 @@ static int handle_statistic(const int socket)
             fprintf(stderr, "decode() failed\n");
             return -1;
         }
-
         port = strtol(buffer, NULL, 10);
+
         free(buffer);
         printf("worker --> ip:%s, port: %d\n", ip, port);
 
