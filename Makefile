@@ -39,7 +39,7 @@ run1:
 	./$(BDIR)/$(EXEC2) -q 4000 -s 4010 -w 10 -b 10
 
 run2:
-	./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -i ./data
+	./$(BDIR)/$(EXECUTABLE) -w 4 -b 5 -s 127.0.0.1 -p 4010 -i ./data 
 
 run3:
 	./$(BDIR)/$(EXEC3) -q assets/queries.txt -w 2 -sp 4000 -sip 127.0.0.1
